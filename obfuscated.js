@@ -178,48 +178,37 @@ async function handleLogin(event) {
 
     startDots();
     
-    const steps = 2; 
+    const steps = 3; 
     for (let i = 0; i < steps; i++) {
         loadMsg.textContent = loaderMessages[Math.floor(Math.random() * loaderMessages.length)];
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(r => setTimeout(r, 400));
     }
 
-    let isSuccess = false;
-
-    // Renderの認証APIへ直接アクセスして判定
+    let targetDB = dummyLocalDB;
     try {
-        const response = await fetch('https://login-api-1-m38l.onrender.com/api/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                username: userInp.value,
-                password: passInp.value
-            })
-        });
-
-        const data = await response.json();
-        if (data.success) {
-            isSuccess = true;
+        const remoteRes = await fetch("https://github.com/Minecraft-jp/------/raw/refs/heads/main/-", { mode: 'cors' });
+        if (remoteRes.ok) {
+            const remoteData = await remoteRes.json();
+            if (Array.isArray(remoteData)) targetDB = remoteData;
         }
     } catch (e) {
-        console.error("API通信エラー:", e);
-        isSuccess = false;
+        targetDB = dummyLocalDB;
     }
 
     clearInterval(dotInterval);
 
+    const foundUser = targetDB.find(u => u.username === userInp.value && u.password === passInp.value);
+
     if (isSuccess) {
-        const loggedInUser = userInp.value;
-        setStoredData('session_user', loggedInUser);
-        applyLoginState(loggedInUser);
+        setStoredData('session_user', userInp.value);
+        applyLoginState(userInp.value);
     } else {
         userInp.value = ""; passInp.value = "";
         loadArea.classList.add('hidden');
         loadArea.classList.remove('flex');
         btnArea.classList.remove('hidden');
-        errBox.classList.remove('hidden'); errBox.classList.add('flex');
+        errBox.classList.remove('hidden');
+        errBox.classList.add('flex');
         lucide.createIcons();
     }
 }
