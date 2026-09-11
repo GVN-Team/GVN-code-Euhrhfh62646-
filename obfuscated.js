@@ -1,6 +1,6 @@
 // ====================================================================================
 // アプリ固有のID
-window.APP_UNIQUE_ID = "SiteLikes";
+window.APP_UNIQUE_ID = "SiteJc&Jk";
 // ====================================================================================
 
 // 固有の接頭辞を作成
@@ -119,12 +119,8 @@ function updateAppConfig(key, value) {
     }
 }
 
-const dummyLocalDB = [
-    { username: "UserName The ggrks", password: "Password The Annan" }
-];
-
 const externalLinks = [
-    { no: 1, title: "Likes", url: "https://gvn-team.github.io/Likes-Vm1wR2IxWXlUblJTYkdoUFYwWndZVlJYTVc5aU1XeDBXWHBzVVZWVU1Eaz0-/", icon: "", color: "white", borderColor: "red" }
+    { no: 1, title: "Likes", url: "https://jcandjk.onrender.com", icon: "", color: "white", borderColor: "yellow" }
 ];
 
 let currentUser = null;
@@ -162,8 +158,10 @@ function startDots() {
     }, 100);
 }
 
+// 🔑 API連携に修正した handleLogin 関数
 async function handleLogin(event) {
-    event.preventDefault();
+    if (event) event.preventDefault();
+
     const userInp = document.getElementById('userId');
     const passInp = document.getElementById('userPwd');
     const errBox = document.getElementById('loginError');
@@ -171,43 +169,61 @@ async function handleLogin(event) {
     const loadArea = document.getElementById('loadingArea');
     const loadMsg = document.getElementById('loadingMsg');
 
+    if (!userInp || !passInp) {
+        alert("エラー: フォーム入力要素(userId / userPwd)が見つかりません。");
+        return;
+    }
+
     errBox.classList.add('hidden');
     btnArea.classList.add('hidden');
     loadArea.classList.remove('hidden');
     loadArea.classList.add('flex');
 
     startDots();
-    
-    const steps = 3; 
+
+    const steps = 2; 
     for (let i = 0; i < steps; i++) {
         loadMsg.textContent = loaderMessages[Math.floor(Math.random() * loaderMessages.length)];
-        await new Promise(r => setTimeout(r, 400));
+        await new Promise(r => setTimeout(r, 300));
     }
 
-    let targetDB = dummyLocalDB;
+    let isSuccess = false;
+
+    // APIへ認証POSTリクエストを送信
     try {
-        const remoteRes = await fetch("https://github.com/Minecraft-jp/------/raw/refs/heads/main/-", { mode: 'cors' });
-        if (remoteRes.ok) {
-            const remoteData = await remoteRes.json();
-            if (Array.isArray(remoteData)) targetDB = remoteData;
+        const response = await fetch('https://login-api-1-m38l.onrender.com/api/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                username: userInp.value,
+                password: passInp.value
+            })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            isSuccess = true;
         }
     } catch (e) {
-        targetDB = dummyLocalDB;
+        alert("通信エラーが発生しました: " + e.message);
+        isSuccess = false;
     }
 
     clearInterval(dotInterval);
 
-    const foundUser = targetDB.find(u => u.username === userInp.value && u.password === passInp.value);
-
     if (isSuccess) {
-        setStoredData('session_user', userInp.value);
-        applyLoginState(userInp.value);
+        const loggedUser = userInp.value;
+        setStoredData('session_user', loggedUser);
+        applyLoginState(loggedUser);
     } else {
-        userInp.value = ""; passInp.value = "";
+        userInp.value = ""; 
+        passInp.value = "";
         loadArea.classList.add('hidden');
         loadArea.classList.remove('flex');
         btnArea.classList.remove('hidden');
-        errBox.classList.remove('hidden');
+        errBox.classList.remove('hidden'); 
         errBox.classList.add('flex');
         lucide.createIcons();
     }
@@ -530,15 +546,16 @@ function renderExternalLinks() {
 }
 
 const videos = [
-    { id: 1, 
-        type: "video",
-        title: "おすすめ", 
-        url: "https://github.com/GVN-Team/UjFaT0xVMVFOQzFGYm1OdlpHVXRjbVZ6ZEc5eVpTMUtjMnBrYUZOb1oyUm5SR2hvWkNOZEkzMGxY-U1Y3ZTExN1hRPT0-/raw/refs/heads/UjFaT0xVMVFOQzFGYm1OdlpHVXRjbVZ6ZEc5eVpTMWljbUZ1WTJndFNuTnFjMmhLWkdoa2FFUm9h-R1pvUm1obWFFZDdJMTBqVzF3cQ0KWENwOEpDUjhLMTBxZXlvOVhPS0NyRUF1/33549.mp4", 
-        thumbnail: "https://github.com/GVN-Team/UjFaT0xVMVFOQzFGYm1OdlpHVXRjbVZ6ZEc5eVpTMUtjMnBrYUZOb1oyUm5SR2hvWkNOZEkzMGxY-U1Y3ZTExN1hRPT0-/raw/refs/heads/UjFaT0xVMVFOQzFGYm1OdlpHVXRjbVZ6ZEc5eVpTMWljbUZ1WTJndFNuTnFjMmhLWkdoa2FFUm9h-R1pvUm1obWFFZDdJMTBqVzF3cQ0KWENwOEpDUjhLMTBxZXlvOVhPS0NyRUF1/IMG_8398.png", 
-        duration: "2:20", 
-        date: "2026/08/26", 
-        desc: "File Size : 7.1MB" 
-    }
+    { id: 1, type:"video", title: "Jcおなにー(第一弾)", url: "https://github.com/Minecraft-jp/Haha/raw/refs/heads/main/a1%20(9).mp4", thumbnail: "https://github.com/Minecraft-jp/Haha/raw/refs/heads/main/IMG_6924.png", duration: "0:26", date: "2026/07/28", desc: "Jc\n#女性 #えろ #1人 #jk #1 " },
+    { id: 2, type:"video", title: "Jcおなにー(第二弾)", url: "https://github.com/Minecraft-jp/Haha/raw/refs/heads/main/a1%20(8).mp4", thumbnail: "https://github.com/Minecraft-jp/Haha/raw/refs/heads/main/IMG_6962.jpeg", duration: "0:41", date: "2026/07/28", desc: "Jc\n#女性 #えろ #1人 #jk #2 " },
+    { id: 3, type:"video", title: "Jcおなにー(第三弾)", url: "https://github.com/Minecraft-jp/Haha/raw/refs/heads/main/a1%20(7).mp4", thumbnail: "https://github.com/Minecraft-jp/Haha/raw/refs/heads/main/IMG_6931.png", duration: "2:20", date: "2026/07/28", desc: "Jc\n#女性 #えろ #1人 #jk #3 " },
+    { id: 4, type:"video", title: "Jkおなにー(第四弾)", url: "https://github.com/Minecraft-jp/Haha/raw/refs/heads/main/a1%20(6).mp4", thumbnail: "https://github.com/Minecraft-jp/Haha/raw/refs/heads/main/IMG_6981.jpeg", duration: "1:04", date: "2026/07/29", desc: "Jk\n#女性 #えろ #1人 #jk #4 " },
+    { id: 5, type:"video", title: "Jkおなにー(第五弾)", url: "https://github.com/Minecraft-jp/Haha/raw/refs/heads/main/a1%20(5).mp4", thumbnail: "https://github.com/Minecraft-jp/Haha/raw/refs/heads/main/IMG_6982.png", duration: "1:02", date: "2026/07/29", desc: "Jk\n#女性 #えろ #1人 #jk #5 " },
+    { id: 6, type:"video", title: "Jcおなにー(第六弾)", url: "https://github.com/Minecraft-jp/Haha/raw/refs/heads/main/a1%20(4).mp4", thumbnail: "https://github.com/Minecraft-jp/Haha/raw/refs/heads/main/IMG_6983.jpeg", duration: "0:31", date: "2026/07/29", desc: "Jc\n#女性 #えろ #1人 #jk #6 " },
+    { id: 7, type:"video", title: "Jkおなにー(第七弾)", url: "https://github.com/Minecraft-jp/Haha/raw/refs/heads/main/a1%20(3).mp4", thumbnail: "https://github.com/Minecraft-jp/Haha/raw/refs/heads/main/IMG_6985.jpeg", duration: "2:44", date: "2026/07/30", desc: "Jk\n#女性 #えろ #1人 #jk #7 " },            
+    { id: 8, type:"video", title: "Jcおなにー(第八弾)", url: "https://github.com/Minecraft-jp/Haha/raw/refs/heads/main/a1%20(2).mp4", thumbnail: "https://github.com/Minecraft-jp/Haha/raw/refs/heads/main/IMG_6995.jpeg", duration: "1:39", date: "2026/07/30", desc: "Jc\n#女性 #えろ #1人 #jk #8 " },
+    { id: 9, type:"video", title: "Jkおなにー(第九弾)", url: "https://github.com/Minecraft-jp/Haha/raw/refs/heads/main/a1%20(10).mp4", thumbnail: "https://github.com/Minecraft-jp/Haha/raw/refs/heads/main/IMG_6996.jpeg", duration: "2:20", date: "2026/07/30", desc: "Jk\n#女性 #えろ #1人 #jk #9 " },
+    { id: 10, type:"video", title: "Jkおなにー(第十弾)", url: "https://github.com/Minecraft-jp/Haha/raw/refs/heads/main/a1%20(1).mp4", thumbnail: "https://github.com/Minecraft-jp/Haha/raw/refs/heads/main/IMG_6997.png", duration: "0:32", date: "2026/07/30", desc: "Jk\n#女性 #えろ #1人 #jk #10 " }
 ];
 
 let activeId = 1;
@@ -800,10 +817,10 @@ function toggleTheaterMode() {
 }
 
 async function shareVideo() {
-    const finalShareUrl = `https://gvn-team.github.io/Likes-Vm1wR2IxWXlUblJTYkdoUFYwWndZVlJYTVc5aU1XeDBXWHBzVVZWVU1Eaz0-/`;
+    const finalShareUrl = `https://jcandjk.onrender.com`;
     if (navigator.share) {
         try {
-            await navigator.share({ title: "Likes - GVN", text: "Likes - GVN", url: finalShareUrl });
+            await navigator.share({ title: "Jc&Jk配布", text: "🚫二次拡散厳禁🚫", url: finalShareUrl });
             showToast("共有メニューを開きました", 'share');
         } catch (error) {}
     } else {
