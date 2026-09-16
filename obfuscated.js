@@ -1,6 +1,6 @@
 // ====================================================================================
-// アプリ固有のID
-window.APP_UNIQUE_ID = "SiteLikes";
+// アプリ固有のID（Child_script.jsで先に定義されていればそれを優先）
+window.APP_UNIQUE_ID = window.APP_UNIQUE_ID || "SiteLikes";
 // ====================================================================================
 
 // 固有の接頭辞を作成
@@ -123,7 +123,12 @@ const dummyLocalDB = [
     { username: "UserName The ggrks", password: "Password The Annan" }
 ];
 
-const externalLinks = [
+// Child_script.js で追加・指定されたDBがあれば結合/優先
+if (Array.isArray(window.CHILD_DUMMY_DB)) {
+    dummyLocalDB.push(...window.CHILD_DUMMY_DB);
+}
+
+const externalLinks = window.CHILD_EXTERNAL_LINKS || [
     { no: 1, title: "Likes", url: "https://gvn-team.github.io/Likes-Vm1wR2IxWXlUblJTYkdoUFYwWndZVlJYTVc5aU1XeDBXWHBzVVZWVU1Eaz0-/", icon: "", color: "white", borderColor: "red" }
 ];
 
@@ -567,7 +572,7 @@ function renderExternalLinks() {
     lucide.createIcons();
 }
 
-const videos = [
+const videos = window.CHILD_VIDEOS || [
     { id: 1, 
         type: "video",
         title: "おすすめ", 
