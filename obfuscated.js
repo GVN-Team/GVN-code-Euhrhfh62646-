@@ -1313,22 +1313,57 @@ function updateVolumeIcon() {
 // ====================================================================================
 
 const DISCORD_CONFIG = {
-    clientId: window.DISCORD_CLIENT_ID || "123456789012345678", // 必要に応じて置き換え可能
+    clientId: getStoredData('discord_client_id', window.DISCORD_CLIENT_ID || ""),
     redirectUri: window.DISCORD_REDIRECT_URI || window.location.origin + window.location.pathname,
     scope: "identify email"
 };
 
 /**
+ * Discord Client IDの設定・更新
+ */
+function setDiscordClientId(id) {
+    if (id) {
+        setStoredData('discord_client_id', id);
+        DISCORD_CONFIG.clientId = id;
+    }
+}
+
+/**
  * Discord ログイン画面へリダイレクト
  */
 function loginWithDiscord() {
-    if (window.SITE_CONFIG && window.SITE_CONFIG.discord && window.SITE_CONFIG.discord.loginUrl) {
-        window.location.href = window.SITE_CONFIG.discord.loginUrl;
-        return;
-    }
+    try {
+        if (window.SITE_CONFIG && window.SITE_CONFIG.discord && window.SITE_CONFIG.discord.loginUrl) {
+            window.location.href = window.SITE_CONFIG.discord.loginUrl;
+            return;
+        }
 
-    const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(DISCORD_CONFIG.clientId)}&redirect_uri=${encodeURIComponent(DISCORD_CONFIG.redirectUri)}&response_type=token&scope=${encodeURIComponent(DISCORD_CONFIG.scope)}`;
-    window.location.href = authUrl;
+        let clientId = DISCORD_CONFIG.clientId || getStoredData('discord_client_id', '');
+
+        // Client IDが未設定、あるいは初期サンプル値の場合に入力を促す
+        if (!clientId || clientId === "123456789012345678") {
+            const inputId = prompt("Discord Client ID が設定されていません。\nDiscord Developer Portal で取得した「Client ID」を入力してください:");
+            if (inputId && inputId.trim() !== "") {
+                clientId = inputId.trim();
+                setDiscordClientId(clientId);
+            } else {
+                showToast("Discord Client ID が未設定のため処理をキャンセルしました", "system");
+                return;
+            }
+        }
+
+        const redirectUri = window.location.origin + window.location.pathname;
+        const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(DISCORD_CONFIG.scope)}`;
+        
+        showToast("Discordログイン画面へ移動します...", "system");
+        setTimeout(() => {
+            window.location.href = authUrl;
+        }, 500);
+
+    } catch (err) {
+        console.error("Discord login error:", err);
+        showToast("Discord ログインの移動中にエラーが発生しました", "system");
+    }
 }
 
 /**
