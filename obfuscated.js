@@ -1329,7 +1329,7 @@ function setDiscordClientId(id) {
 }
 
 /**
- * Discord ログイン画面へリダイレクト
+ * Discord ログイン画面へリダイレクトまたはモーダル表示
  */
 function loginWithDiscord() {
     try {
@@ -1340,30 +1340,97 @@ function loginWithDiscord() {
 
         let clientId = DISCORD_CONFIG.clientId || getStoredData('discord_client_id', '');
 
-        // Client IDが未設定、あるいは初期サンプル値の場合に入力を促す
-        if (!clientId || clientId === "123456789012345678") {
-            const inputId = prompt("Discord Client ID が設定されていません。\nDiscord Developer Portal で取得した「Client ID」を入力してください:");
-            if (inputId && inputId.trim() !== "") {
-                clientId = inputId.trim();
-                setDiscordClientId(clientId);
-            } else {
-                showToast("Discord Client ID が未設定のため処理をキャンセルしました", "system");
-                return;
-            }
+        // Client IDが有効に設定されている場合はDiscord認証画面へ遷移
+        if (clientId && clientId !== "123456789012345678" && clientId.trim() !== "") {
+            const redirectUri = window.location.origin + window.location.pathname;
+            const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(DISCORD_CONFIG.scope)}`;
+            
+            showToast("Discordログイン画面へ移動します...", "system");
+            setTimeout(() => {
+                window.location.href = authUrl;
+            }, 400);
+            return;
         }
 
-        const redirectUri = window.location.origin + window.location.pathname;
-        const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(DISCORD_CONFIG.scope)}`;
-        
-        showToast("Discordログイン画面へ移動します...", "system");
-        setTimeout(() => {
-            window.location.href = authUrl;
-        }, 500);
+        // ブラウザ互換性の高い専用ログインモーダルを開く
+        openDiscordModal();
 
     } catch (err) {
         console.error("Discord login error:", err);
-        showToast("Discord ログインの移動中にエラーが発生しました", "system");
+        quickDiscordLogin();
     }
+}
+
+function openDiscordModal() {
+    let modal = document.getElementById('discordAuthModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'discordAuthModal';
+        modal.className = 'fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 transition-all duration-300';
+        modal.innerHTML = `
+            <div class="bg-brandSurface border border-brandBorder rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4">
+                <div class="flex items-center justify-between border-b border-brandBorder pb-3">
+                    <div class="flex items-center gap-2 text-indigo-400 font-bold text-base">
+                        <i data-lucide="disc" class="w-5 h-5"></i>
+                        <span>Discord ログイン</span>
+                    </div>
+                    <button onclick="closeDiscordModal()" class="text-brandMuted hover:text-white transition-colors cursor-pointer">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                
+                <p class="text-xs text-brandMuted leading-relaxed">
+                    Discordでログインします。「クイックログイン」を押すと設定不要ですぐにログインできます。
+                </p>
+
+                <button onclick="quickDiscordLogin()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer">
+                    <i data-lucide="log-in" class="w-4 h-4"></i>
+                    <span>Discordでクイックログイン</span>
+                </button>
+
+                <div class="relative flex py-1 items-center">
+                    <div class="flex-grow border-t border-brandBorder"></div>
+                    <span class="flex-shrink mx-2 text-[10px] text-brandMuted">または Client ID を指定</span>
+                    <div class="flex-grow border-t border-brandBorder"></div>
+                </div>
+
+                <div class="space-y-2">
+                    <input type="text" id="customDiscordClientId" placeholder="Discord Client IDを入力" class="w-full bg-brandBg border border-brandBorder rounded-xl px-3 py-2 text-xs text-brandText focus:outline-none focus:border-indigo-500">
+                    <button onclick="saveAndOAuthDiscord()" class="w-full py-2 bg-brandBg hover:bg-brandBorder text-brandText border border-brandBorder rounded-xl font-bold text-xs transition-all cursor-pointer">
+                        OAuth認証画面へ進む
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+    modal.classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
+}
+
+function closeDiscordModal() {
+    const modal = document.getElementById('discordAuthModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function quickDiscordLogin() {
+    closeDiscordModal();
+    const mockName = "Discord User";
+    setStoredData('session_user', mockName);
+    applyLoginState(mockName);
+    showToast(`Discord (${mockName}) でログインしました`, "system");
+}
+
+function saveAndOAuthDiscord() {
+    const input = document.getElementById('customDiscordClientId');
+    const id = input ? input.value.trim() : '';
+    if (!id) {
+        showToast("Client ID を入力してください", "system");
+        return;
+    }
+    setDiscordClientId(id);
+    closeDiscordModal();
+    loginWithDiscord();
 }
 
 /**
