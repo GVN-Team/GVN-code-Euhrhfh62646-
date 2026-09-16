@@ -132,56 +132,8 @@ let userWatchHistory = [];
 let userWatchLater = [];
 let userResumeTimes = {};
 
-// --- Discord認証処理の追加 ---
-function loginWithDiscord() {
-    const discordAuthUrl = "https://discord.com/oauth2/authorize?client_id=1546182857364607076&response_type=code&redirect_uri=https%3A%2F%2Fnanani-hhsbsjsnzjxux62737377474.onrender.com%2F&scope=identify+guilds+guilds.members.read";
-    window.location.href = discordAuthUrl;
-}
-
-async function handleDiscordCallback() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    
-    if (!code) return;
-
-    const loadArea = document.getElementById('loadingArea');
-    const loadMsg = document.getElementById('loadingMsg');
-    const errBox = document.getElementById('loginError');
-    const btnArea = document.getElementById('loginBtnContainer');
-
-    if (loadArea) {
-        btnArea?.classList.add('hidden');
-        loadArea.classList.remove('hidden');
-        loadArea.classList.add('flex');
-        if (loadMsg) loadMsg.textContent = "Discordアカウントで認証中...";
-        startDots();
-    }
-
-    try {
-        // バックエンド経由等でOAuthトークンおよびサーバー所属・ロール判定を実施する処理
-        // フロントエンドのみでのデモ動作としてコード受領時にログイン状態へ切り替えます
-        window.history.replaceState({}, document.title, window.location.pathname);
-        clearInterval(dotInterval);
-        
-        setStoredData('session_user', "DiscordUser");
-        applyLoginState("DiscordUser");
-    } catch (e) {
-        clearInterval(dotInterval);
-        if (loadArea) loadArea.classList.add('hidden');
-        if (btnArea) btnArea.classList.remove('hidden');
-        if (errBox) {
-            errBox.classList.remove('hidden');
-            errBox.classList.add('flex');
-        }
-    }
-}
-
 window.onload = function() {
     lucide.createIcons();
-    
-    // Discordログインのリダイレクト（URLパラメータ ?code=...）があるかチェック
-    handleDiscordCallback();
-
     const savedUser = getStoredData('session_user', null);
     if (savedUser) {
         applyLoginState(savedUser);
@@ -206,7 +158,7 @@ function startDots() {
     const dotsEl = document.getElementById('loadingDots');
     dotInterval = setInterval(() => {
         count = (count % 3) + 1;
-        if (dotsEl) dotsEl.textContent = ".".repeat(count);
+        dotsEl.textContent = ".".repeat(count);
     }, 100);
 }
 
@@ -1166,7 +1118,6 @@ function changeVolume(delta) {
 function showToast(msg, category = 'system') {
     if (category && notificationSettings[category] === false) return;
     const t = document.getElementById("toast");
-    if (!t) return;
     document.getElementById("toastMsg").textContent = msg;
     t.classList.remove("translate-y-10", "opacity-0", "pointer-events-none");
     t.classList.add("translate-y-10", "opacity-100");
@@ -1244,7 +1195,7 @@ function setupPlayerEventListeners() {
     seekBar.onmousedown = seekBar.ontouchstart = () => dragging = true;
     seekBar.oninput = () => { seekBar.style.setProperty('--seek-percent', `${seekBar.value}%`); if(!isNaN(player.duration)) { player.currentTime = (seekBar.value/100)*player.duration; currentTimeText.textContent = formatTime(player.currentTime); } };
     seekBar.onchange = window.onmouseup = window.ontouchend = () => { if(dragging) { dragging=false; if(!isNaN(player.duration)) player.currentTime = (seekBar.value/100)*player.duration; } };
-    volumeBar.oninput = () => { player.volume = volumeBar.value/100; player.muted = volumeBar.value===0; updateVolumeBarUI(volumeBar.value); updateVolumeIcon(); };
+    volumeBar.oninput = () => { player.volume = volumeBar.value/100; player.muted = player.volume===0; updateVolumeBarUI(volumeBar.value); updateVolumeIcon(); };
     muteBtn.onclick = () => { player.muted = !player.muted; updateVolumeBarUI(player.muted ? 0 : Math.round(player.volume*100)); updateVolumeIcon(); };
     fullscreenBtn.onclick = toggleFullscreen;
 }
