@@ -123,7 +123,6 @@ const dummyLocalDB = [
     { username: "UserName The ggrks", password: "Password The Annan" }
 ];
 
-// Child_script.js で追加・指定されたDBがあれば結合/優先
 if (Array.isArray(window.CHILD_DUMMY_DB)) {
     dummyLocalDB.push(...window.CHILD_DUMMY_DB);
 }
@@ -138,9 +137,9 @@ let userWatchLater = [];
 let userResumeTimes = {};
 
 window.onload = function() {
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
     
-    // Discord OAuthのコールバックをチェック
+    // バックエンド不要の Discord OAuth コールバック判定
     handleDiscordOAuthCallback();
 
     const savedUser = getStoredData('session_user', null);
@@ -225,7 +224,7 @@ async function handleLogin(event) {
         if (errBox) {
             errBox.classList.remove('hidden'); errBox.classList.add('flex');
         }
-        lucide.createIcons();
+        if (window.lucide) lucide.createIcons();
     }
 }
 
@@ -418,7 +417,7 @@ function openHistoryModal() {
         });
     }
     document.getElementById('historyModal').classList.remove('hidden');
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
 
 function closeHistoryModal() {
@@ -456,7 +455,7 @@ function updateWatchLaterBtnUI() {
     } else {
         btn.innerHTML = `<i data-lucide="bookmark" class="w-5 h-5 text-amber-400 fill-transparent"></i>`;
     }
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
 
 function openWatchLaterModal() {
@@ -487,7 +486,7 @@ function openWatchLaterModal() {
         });
     }
     document.getElementById('watchLaterModal').classList.remove('hidden');
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
 
 function removeFromWatchLater(id, e) {
@@ -569,7 +568,7 @@ function renderExternalLinks() {
         `;
         container.appendChild(linkEl);
     });
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
 
 const videos = window.CHILD_VIDEOS || [
@@ -613,7 +612,7 @@ function initPlayer() {
     
     renderPlaylist();
     renderExternalLinks(); 
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
     setupPlayerEventListeners();
     updateVolumeBarUI(100);
     
@@ -817,14 +816,14 @@ function startVideoPlayback() {
     if (appConfig.autoPlay) {
         player.play().then(() => {
             if (playBtn) playBtn.innerHTML = `<i data-lucide="pause" class="w-6 h-6 fill-current"></i>`;
-            lucide.createIcons();
+            if (window.lucide) lucide.createIcons();
         }).catch((err) => {
             if (playBtn) playBtn.innerHTML = `<i data-lucide="play" class="w-6 h-6 fill-current"></i>`;
-            lucide.createIcons();
+            if (window.lucide) lucide.createIcons();
         });
     } else {
         if (playBtn) playBtn.innerHTML = `<i data-lucide="play" class="w-6 h-6 fill-current"></i>`;
-        lucide.createIcons();
+        if (window.lucide) lucide.createIcons();
         player.addEventListener('canplay', () => { if (videoSpinner) videoSpinner.classList.add("hidden"); }, {once:true});
     }
     resetControlsTimeout();
@@ -853,7 +852,7 @@ function toggleTheaterMode() {
         if (theaterBtn) theaterBtn.innerHTML = `<i data-lucide="rectangle-horizontal" class="w-5 h-5"></i>`;
         showToast("大画面モード: OFF", 'system');
     }
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
 
 async function shareVideo() {
@@ -993,7 +992,7 @@ function renderSortDropdownItems() {
         `;
         container.appendChild(btn);
     });
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
 
 function selectSortOption(key) {
@@ -1030,7 +1029,7 @@ function renderPlaylist() {
                 <i data-lucide="search-x" class="w-8 h-8 mx-auto opacity-50"></i>
                 <p class="text-xs font-bold">該当する動画が見つかりませんでした</p>
             </div>`;
-        lucide.createIcons();
+        if (window.lucide) lucide.createIcons();
         return;
     }
 
@@ -1056,7 +1055,7 @@ function renderPlaylist() {
             </div>`;
         playlistContainer.appendChild(card);
     });
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
 
 function setupDoubleTapGestures() {
@@ -1240,7 +1239,7 @@ function onFullscreenChange() {
     if (container) {
         isFull ? container.classList.remove("rounded-theme") : container.classList.add("rounded-theme");
     }
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
 
 let resumeSaveTimer = null;
@@ -1274,7 +1273,7 @@ function setupPlayerEventListeners() {
         delete userResumeTimes[activeId];
         saveUserDataToCloud();
         if (playBtn) playBtn.innerHTML = `<i data-lucide="play" class="w-6 h-6 fill-current"></i>`;
-        lucide.createIcons();
+        if (window.lucide) lucide.createIcons();
         resetControlsTimeout();
     };
 
@@ -1302,7 +1301,7 @@ function togglePlay() {
         if (playBtn) playBtn.innerHTML = `<i data-lucide="play" class="w-6 h-6 fill-current"></i>`; 
     }
     resetControlsTimeout();
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
 
 function updateVolumeIcon() {
@@ -1310,22 +1309,18 @@ function updateVolumeIcon() {
     if (player.muted || player.volume===0) muteBtn.innerHTML = `<i data-lucide="volume-x" class="w-5 h-5 text-red-500"></i>`;
     else if (player.volume<0.5) muteBtn.innerHTML = `<i data-lucide="volume-1" class="w-5 h-5"></i>`;
     else muteBtn.innerHTML = `<i data-lucide="volume-2" class="w-5 h-5"></i>`;
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
 
 // ====================================================================================
-// Discord 認証拡張機能 (既存コードは保持したまま追加)
+// バックエンド不要（純粋フロントエンド）の Discord OAuth2 ログイン機能
 // ====================================================================================
 
 const DISCORD_CONFIG = {
-    clientId: getStoredData('discord_client_id', window.DISCORD_CLIENT_ID || ""),
-    redirectUri: window.DISCORD_REDIRECT_URI || window.location.origin + window.location.pathname,
+    clientId: getStoredData('discord_client_id', window.CHILD_DISCORD_CLIENT_ID || window.DISCORD_CLIENT_ID || ""),
     scope: "identify email"
 };
 
-/**
- * Discord Client IDの設定・更新
- */
 function setDiscordClientId(id) {
     if (id) {
         setStoredData('discord_client_id', id);
@@ -1334,30 +1329,25 @@ function setDiscordClientId(id) {
 }
 
 /**
- * Discord ログイン画面へリダイレクトまたはモーダル表示
+ * バックエンドなしで動作するDiscordログイン処理
  */
 function loginWithDiscord() {
     try {
-        if (window.SITE_CONFIG && window.SITE_CONFIG.discord && window.SITE_CONFIG.discord.loginUrl) {
-            window.location.href = window.SITE_CONFIG.discord.loginUrl;
-            return;
-        }
-
         let clientId = DISCORD_CONFIG.clientId || getStoredData('discord_client_id', '');
 
-        // Client IDが有効に設定されている場合はDiscord認証画面へ遷移
-        if (clientId && clientId !== "123456789012345678" && clientId.trim() !== "") {
+        // Client ID が定義されている場合は、バックエンド不要の implicit grant (response_type=token) でリダイレクト
+        if (clientId && clientId.trim() !== "") {
             const redirectUri = window.location.origin + window.location.pathname;
             const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(DISCORD_CONFIG.scope)}`;
             
             showToast("Discordログイン画面へ移動します...", "system");
             setTimeout(() => {
                 window.location.href = authUrl;
-            }, 400);
+            }, 300);
             return;
         }
 
-        // ブラウザ互換性の高い専用ログインモーダルを開く
+        // Client IDが指定されていない場合はワンクリックでログイン完了するUIモーダルを表示
         openDiscordModal();
 
     } catch (err) {
@@ -1385,7 +1375,7 @@ function openDiscordModal() {
                 </div>
                 
                 <p class="text-xs text-brandMuted leading-relaxed">
-                    Discordでログインします。「クイックログイン」を押すと設定不要ですぐにログインできます。
+                    サーバー（バックエンド）不要で動作します。「クイックログイン」を押すと即座にログイン可能です。
                 </p>
 
                 <button onclick="quickDiscordLogin()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer">
@@ -1395,14 +1385,14 @@ function openDiscordModal() {
 
                 <div class="relative flex py-1 items-center">
                     <div class="flex-grow border-t border-brandBorder"></div>
-                    <span class="flex-shrink mx-2 text-[10px] text-brandMuted">または Client ID を指定</span>
+                    <span class="flex-shrink mx-2 text-[10px] text-brandMuted">または Client ID を保存して連携</span>
                     <div class="flex-grow border-t border-brandBorder"></div>
                 </div>
 
                 <div class="space-y-2">
                     <input type="text" id="customDiscordClientId" placeholder="Discord Client IDを入力" class="w-full bg-brandBg border border-brandBorder rounded-xl px-3 py-2 text-xs text-brandText focus:outline-none focus:border-indigo-500">
                     <button onclick="saveAndOAuthDiscord()" class="w-full py-2 bg-brandBg hover:bg-brandBorder text-brandText border border-brandBorder rounded-xl font-bold text-xs transition-all cursor-pointer">
-                        OAuth認証画面へ進む
+                        OAuth2 認証画面へ進む
                     </button>
                 </div>
             </div>
@@ -1439,43 +1429,36 @@ function saveAndOAuthDiscord() {
 }
 
 /**
- * URLハッシュやクエリからDiscord OAuthレスポンスを検出しログイン
+ * URLハッシュ (#access_token=...) を受け取って、フロントエンドから直接 Discord API をコール
  */
 function handleDiscordOAuthCallback() {
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const queryParams = new URLSearchParams(window.location.search);
-
     const accessToken = hashParams.get('access_token');
-    const code = queryParams.get('code');
 
     if (accessToken) {
-        // Access Tokenからユーザー情報を取得
+        // フロントエンドから直接 Discord API へアクセス (CORS対応済み)
         fetch('https://discord.com/api/users/@me', {
             headers: {
                 authorization: `Bearer ${accessToken}`
             }
         })
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) throw new Error("Network response was not ok");
+            return res.json();
+        })
         .then(userData => {
             if (userData && userData.username) {
-                const discordName = `${userData.username}`;
+                const discordName = userData.global_name || userData.username;
                 setStoredData('session_user', discordName);
                 applyLoginState(discordName);
-                showToast(`Discordアカウント (${discordName}) でログインしました`, "system");
-                // URLハッシュをきれいに除去
+                showToast(`Discord (${discordName}) でログインしました`, "system");
+                // URLハッシュをクリア
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
         })
         .catch(err => {
-            console.error('Discord user fetch failed:', err);
-            showToast('Discord認証に失敗しました', 'system');
+            console.error('Discord API Fetch failed:', err);
+            showToast('Discordユーザー情報の取得に失敗しました', 'system');
         });
-    } else if (code) {
-        // OAuth Codeレスポンス
-        const discordUser = "Discord User";
-        setStoredData('session_user', discordUser);
-        applyLoginState(discordUser);
-        showToast("Discord認証に成功しました", "system");
-        window.history.replaceState({}, document.title, window.location.pathname);
     }
 }
