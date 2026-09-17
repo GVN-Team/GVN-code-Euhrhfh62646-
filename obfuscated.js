@@ -1,5 +1,5 @@
 // ====================================================================================
-// アプリ固有のID（Child_script.jsで先に定義されていればそれを優先）
+// アプリ固有のID（child_script.jsで先に定義されていればそれを優先）
 window.APP_UNIQUE_ID = window.APP_UNIQUE_ID || "SiteLikes";
 // ====================================================================================
 
@@ -139,7 +139,7 @@ let userResumeTimes = {};
 window.onload = function() {
     if (window.lucide) lucide.createIcons();
     
-    // バックエンド不要の Discord OAuth コールバック判定
+    // Discord OAuth コールバック判定
     handleDiscordOAuthCallback();
 
     const savedUser = getStoredData('session_user', null);
@@ -1313,18 +1313,24 @@ function updateVolumeIcon() {
 }
 
 // ====================================================================================
-// バックエンド不要（純粋フロントエンド）の Discord OAuth2 ログイン機能
+// Discord OAuth2 ログイン機能（パターンA: child_script.js の設定を優先読み込み）
 // ====================================================================================
 
-const DISCORD_CONFIG = {
-    clientId: getStoredData('discord_client_id', window.CHILD_DISCORD_CLIENT_ID || window.DISCORD_CLIENT_ID || ""),
-    scope: "identify email"
-};
+function getDiscordConfig() {
+    const childConfig = window.CHILD_DISCORD_CONFIG || {};
+    return {
+        clientId: childConfig.clientId || getStoredData('discord_client_id', window.CHILD_DISCORD_CLIENT_ID || window.DISCORD_CLIENT_ID || ""),
+        scope: childConfig.scope || "identify email",
+        onSuccess: childConfig.onSuccess || null
+    };
+}
 
 function setDiscordClientId(id) {
     if (id) {
         setStoredData('discord_client_id', id);
-        DISCORD_CONFIG.clientId = id;
+        if (window.CHILD_DISCORD_CONFIG) {
+            window.CHILD_DISCORD_CONFIG.clientId = id;
+        }
     }
 }
 
@@ -1333,12 +1339,11 @@ function setDiscordClientId(id) {
  */
 function loginWithDiscord() {
     try {
-        let clientId = DISCORD_CONFIG.clientId || getStoredData('discord_client_id', '');
+        const config = getDiscordConfig();
 
-        // Client ID が定義されている場合は、バックエンド不要の implicit grant (response_type=token) でリダイレクト
-        if (clientId && clientId.trim() !== "") {
+        if (config.clientId && config.clientId.trim() !== "" && config.clientId !== "YOUR_DISCORD_CLIENT_ID_HERE") {
             const redirectUri = window.location.origin + window.location.pathname;
-            const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(DISCORD_CONFIG.scope)}`;
+            const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(config.clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(config.scope)}`;
             
             showToast("Discordログイン画面へ移動します...", "system");
             setTimeout(() => {
@@ -1347,7 +1352,7 @@ function loginWithDiscord() {
             return;
         }
 
-        // Client IDが指定されていない場合はワンクリックでログイン完了するUIモーダルを表示
+        // Client IDが指定されていない場合はモーダルを表示
         openDiscordModal();
 
     } catch (err) {
@@ -1414,6 +1419,12 @@ function quickDiscordLogin() {
     setStoredData('session_user', mockName);
     applyLoginState(mockName);
     showToast(`Discord (${mockName}) でログインしました`, "system");
+
+    // 子側のコールバック呼び出し
+    const config = getDiscordConfig();
+    if (typeof config.onSuccess === 'function') {
+        config.onSuccess({ username: mockName, isQuickLogin: true });
+    }
 }
 
 function saveAndOAuthDiscord() {
@@ -1436,7 +1447,6 @@ function handleDiscordOAuthCallback() {
     const accessToken = hashParams.get('access_token');
 
     if (accessToken) {
-        // フロントエンドから直接 Discord API へアクセス (CORS対応済み)
         fetch('https://discord.com/api/users/@me', {
             headers: {
                 authorization: `Bearer ${accessToken}`
@@ -1452,6 +1462,13 @@ function handleDiscordOAuthCallback() {
                 setStoredData('session_user', discordName);
                 applyLoginState(discordName);
                 showToast(`Discord (${discordName}) でログインしました`, "system");
+
+                // 子サイト側で定義されたカスタムコールバックの実行
+                const config = getDiscordConfig();
+                if (typeof config.onSuccess === 'function') {
+                    config.onSuccess(userData);
+                }
+
                 // URLハッシュをクリア
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
