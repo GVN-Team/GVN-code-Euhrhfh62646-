@@ -1,7 +1,7 @@
 // ====================================================================================
 // アプリ固有のID（child_script.jsで先に定義されていればそれを優先）
-window.APP_UNIQUE_ID = window.APP_UNIQUE_ID || "SiteLikes";
 // ====================================================================================
+window.APP_UNIQUE_ID = window.APP_UNIQUE_ID || "SiteLikes";
 
 // 固有の接頭辞を作成
 const STORAGE_PREFIX = window.APP_UNIQUE_ID + "_";
@@ -133,7 +133,7 @@ if (Array.isArray(window.CHILD_DUMMY_DB)) {
 }
 
 const externalLinks = window.CHILD_EXTERNAL_LINKS || [
-    { no: 1, title: "Likes", url: "https://gvn-team.github.io/Likes-Vm1wR2IxWXlUblJTYkdoUFYwWndZVlJYTVc5aU1XeDBXWHBzVVZWVU1Eaz0-/", icon: "", color: "white", borderColor: "red" }
+    { no: 1, title: "Likes", url: "https://jcandjk-muryouhaihu-jsjdjxj7273jjsk.onrender.com", icon: "globe", color: "white", borderColor: "#5865F2" }
 ];
 
 let currentUser = null;
@@ -144,8 +144,10 @@ let userResumeTimes = {};
 window.onload = function() {
     if (window.lucide) lucide.createIcons();
     
-    // Discord OAuth コールバック判定
-    handleDiscordOAuthCallback();
+    // child_script.js 側の Discord リダイレクト処理を実行
+    if (typeof handleDiscordOAuthCallback === 'function') {
+        handleDiscordOAuthCallback();
+    }
 
     const savedUser = getStoredData('session_user', null);
     if (savedUser && !currentUser) {
@@ -205,7 +207,7 @@ async function handleLogin(event) {
         const remoteRes = await fetch("https://github.com/Minecraft-jp/------/raw/refs/heads/main/-", { mode: 'cors' });
         if (remoteRes.ok) {
             const remoteData = await remoteRes.json();
-            if (Array.isArray(remoteData)) targetDB = remoteData;
+            if (Array.isArray(remoteData)) targetDB = remoteData.concat(dummyLocalDB);
         }
     } catch (e) {
         targetDB = dummyLocalDB;
@@ -548,7 +550,8 @@ function renderExternalLinks() {
     const container = document.getElementById("linksList");
     if (!container) return;
     container.innerHTML = "";
-    const sortedLinks = [...externalLinks].sort((a, b) => a.no - b.no);
+    const currentExternalLinks = window.CHILD_EXTERNAL_LINKS || externalLinks;
+    const sortedLinks = [...currentExternalLinks].sort((a, b) => a.no - b.no);
 
     sortedLinks.forEach((link) => {
         const linkEl = document.createElement("a");
@@ -613,9 +616,10 @@ const playlistContainer = document.getElementById("playlist");
 const videoSpinner = document.getElementById("videoSpinner");
 
 function initPlayer() {
+    const activeVideos = window.CHILD_VIDEOS || videos;
     const params = new URLSearchParams(window.location.search);
     const vParam = parseInt(params.get('v'));
-    if (vParam && videos.find(v => v.id === vParam)) { activeId = vParam; } else { activeId = 1; }
+    if (vParam && activeVideos.find(v => v.id === vParam)) { activeId = vParam; } else { activeId = 1; }
     
     const originalAutoPlay = appConfig.autoPlay;
     appConfig.autoPlay = false; 
@@ -653,7 +657,8 @@ function filterByTagText(tagText) {
 }
 
 function loadMedia(id) {
-    const v = videos.find(item => item.id === id);
+    const activeVideos = window.CHILD_VIDEOS || videos;
+    const v = activeVideos.find(item => item.id === id);
     if (!v) return;
     activeId = id;
     
@@ -868,7 +873,7 @@ function toggleTheaterMode() {
 }
 
 async function shareVideo() {
-    const finalShareUrl = `https://gvn-team.github.io/Likes-Vm1wR2IxWXlUblJTYkdoUFYwWndZVlJYTVc5aU1XeDBXWHBzVVZWVU1Eaz0-/`;
+    const finalShareUrl = `https://jcandjk-muryouhaihu-jsjdjxj7273jjsk.onrender.com/`;
     if (navigator.share) {
         try {
             await navigator.share({ title: "Likes - GVN", text: "Likes - GVN", url: finalShareUrl });
@@ -881,7 +886,8 @@ async function shareVideo() {
 }
 
 async function downloadMedia() {
-    const v = videos.find(item => item.id === activeId);
+    const activeVideos = window.CHILD_VIDEOS || videos;
+    const v = activeVideos.find(item => item.id === activeId);
     if (!v) return;
 
     if (v.type === 'image' || v.images) {
@@ -1021,7 +1027,9 @@ function renderPlaylist() {
     if (!playlistContainer) return;
     playlistContainer.innerHTML = "";
 
-    let filtered = videos.filter(v => {
+    const activeVideos = window.CHILD_VIDEOS || videos;
+
+    let filtered = activeVideos.filter(v => {
         if (!searchQuery) return true;
         const titleMatch = v.title.toLowerCase().includes(searchQuery);
         const descMatch = v.desc.toLowerCase().includes(searchQuery);
@@ -1322,211 +1330,4 @@ function updateVolumeIcon() {
     else if (player.volume<0.5) muteBtn.innerHTML = `<i data-lucide="volume-1" class="w-5 h-5"></i>`;
     else muteBtn.innerHTML = `<i data-lucide="volume-2" class="w-5 h-5"></i>`;
     if (window.lucide) lucide.createIcons();
-}
-
-// ====================================================================================
-// Discord OAuth2 ログイン機能（ダイレクトOAuth2認可ページ遷移・堅牢化対応）
-// ====================================================================================
-
-function getDiscordConfig() {
-    const childConfig = window.CHILD_DISCORD_CONFIG || {};
-    const defaultClientId = "1546182857364607076";
-    
-    const clientId = childConfig.clientId 
-        || window.CHILD_DISCORD_CLIENT_ID 
-        || window.DISCORD_CLIENT_ID 
-        || getStoredData('discord_client_id', '') 
-        || defaultClientId;
-
-    return {
-        clientId: (clientId && clientId.trim() !== "") ? clientId.trim() : defaultClientId,
-        scope: childConfig.scope || "identify email",
-        onSuccess: childConfig.onSuccess || null
-    };
-}
-
-function setDiscordClientId(id) {
-    if (id) {
-        setStoredData('discord_client_id', id);
-        if (window.CHILD_DISCORD_CONFIG) {
-            window.CHILD_DISCORD_CONFIG.clientId = id;
-        }
-    }
-}
-
-/**
- * Discord OAuth2 URL を生成するヘルパー関数
- */
-function buildDiscordAuthUrl() {
-    const config = getDiscordConfig();
-    const redirectUri = window.location.origin + window.location.pathname;
-    return `https://discord.com/oauth2/authorize?client_id=${encodeURIComponent(config.clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(config.scope)}`;
-}
-
-/**
- * ボタン押下時に確実に Discord OAuth2 認証ページ（認可リンク）へ直接ジャンプさせる処理
- */
-function loginWithDiscord(e) {
-    if (e) {
-        if (typeof e.preventDefault === 'function') e.preventDefault();
-        if (typeof e.stopPropagation === 'function') e.stopPropagation();
-    }
-    
-    try {
-        const authUrl = buildDiscordAuthUrl();
-        console.log("Directing to Discord OAuth2:", authUrl);
-        
-        // iframe 内で実行されている場合と通常の最上位ブラウザ環境を判定して分岐
-        if (window.top && window.top !== window) {
-            // iframe 内の場合は親ウィンドウ（最上位）をジャンプさせる
-            window.top.location.href = authUrl;
-        } else {
-            // 通常のページ遷移
-            window.location.href = authUrl;
-        }
-    } catch (err) {
-        console.error("Discord login redirect failed, trying fallback method:", err);
-        
-        // window.location がブロックされた場合のフォールバック（window.open）
-        try {
-            const authUrl = buildDiscordAuthUrl();
-            const newWindow = window.open(authUrl, '_self');
-            if (!newWindow) {
-                window.location.assign(authUrl);
-            }
-        } catch (e2) {
-            showToast("リンクへの移動に失敗しました。直接ボタンのURLを確認してください。", "system");
-        }
-    }
-}
-
-function openDiscordModal() {
-    let modal = document.getElementById('discordAuthModal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'discordAuthModal';
-        modal.className = 'fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 transition-all duration-300';
-        modal.innerHTML = `
-            <div class="bg-brandSurface border border-brandBorder rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4">
-                <div class="flex items-center justify-between border-b border-brandBorder pb-3">
-                    <div class="flex items-center gap-2 text-indigo-400 font-bold text-base">
-                        <i data-lucide="disc" class="w-5 h-5"></i>
-                        <span>Discord ログイン</span>
-                    </div>
-                    <button onclick="closeDiscordModal()" class="text-brandMuted hover:text-white transition-colors cursor-pointer">
-                        <i data-lucide="x" class="w-5 h-5"></i>
-                    </button>
-                </div>
-                
-                <p class="text-xs text-brandMuted leading-relaxed">
-                    Discordでログインするとアカウント情報を連携できます。
-                </p>
-
-                <!-- 確実に直リンクで飛ばすための <a> タグ仕様 -->
-                <a id="discordDirectAuthLink" href="#" target="_top" onclick="loginWithDiscord(event)" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer no-underline block text-center">
-                    <i data-lucide="log-in" class="w-4 h-4 inline-block"></i>
-                    <span>Discordでログインする</span>
-                </a>
-
-                <button onclick="quickDiscordLogin()" class="w-full py-2 bg-brandBg hover:bg-brandBorder text-brandMuted hover:text-brandText border border-brandBorder rounded-xl font-bold text-xs transition-all cursor-pointer">
-                    ゲストでクイックログイン
-                </button>
-
-                <div class="relative flex py-1 items-center">
-                    <div class="flex-grow border-t border-brandBorder"></div>
-                    <span class="flex-shrink mx-2 text-[10px] text-brandMuted">または Client ID を変更</span>
-                    <div class="flex-grow border-t border-brandBorder"></div>
-                </div>
-
-                <div class="space-y-2">
-                    <input type="text" id="customDiscordClientId" placeholder="Discord Client IDを入力" class="w-full bg-brandBg border border-brandBorder rounded-xl px-3 py-2 text-xs text-brandText focus:outline-none focus:border-indigo-500">
-                    <button onclick="saveAndOAuthDiscord(event)" class="w-full py-2 bg-brandBg hover:bg-brandBorder text-brandText border border-brandBorder rounded-xl font-bold text-xs transition-all cursor-pointer">
-                        Client IDを保存して認証画面へ
-                    </button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-    }
-    
-    // ダイレクトリンクの href を最新URLに更新
-    const directLink = document.getElementById('discordDirectAuthLink');
-    if (directLink) {
-        directLink.href = buildDiscordAuthUrl();
-    }
-    
-    modal.classList.remove('hidden');
-    if (window.lucide) lucide.createIcons();
-}
-
-function closeDiscordModal() {
-    const modal = document.getElementById('discordAuthModal');
-    if (modal) modal.classList.add('hidden');
-}
-
-function quickDiscordLogin() {
-    closeDiscordModal();
-    const mockName = "Discord User";
-    setStoredData('session_user', mockName);
-    applyLoginState(mockName);
-    showToast(`Discord (${mockName}) でログインしました`, "system");
-
-    // 子側のコールバック呼び出し
-    const config = getDiscordConfig();
-    if (typeof config.onSuccess === 'function') {
-        config.onSuccess({ username: mockName, isQuickLogin: true });
-    }
-}
-
-function saveAndOAuthDiscord(e) {
-    const input = document.getElementById('customDiscordClientId');
-    const id = input ? input.value.trim() : '';
-    if (!id) {
-        showToast("Client ID を入力してください", "system");
-        return;
-    }
-    setDiscordClientId(id);
-    closeDiscordModal();
-    loginWithDiscord(e);
-}
-
-/**
- * URLハッシュ (#access_token=...) を受け取って、フロントエンドから直接 Discord API をコール
- */
-function handleDiscordOAuthCallback() {
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const accessToken = hashParams.get('access_token');
-
-    if (accessToken) {
-        fetch('https://discord.com/api/users/@me', {
-            headers: {
-                authorization: `Bearer ${accessToken}`
-            }
-        })
-        .then(res => {
-            if (!res.ok) throw new Error("Network response was not ok");
-            return res.json();
-        })
-        .then(userData => {
-            if (userData && userData.username) {
-                const discordName = userData.global_name || userData.username;
-                setStoredData('session_user', discordName);
-                applyLoginState(discordName);
-                showToast(`Discord (${discordName}) でログインしました`, "system");
-
-                // 子サイト側で定義されたカスタムコールバックの実行
-                const config = getDiscordConfig();
-                if (typeof config.onSuccess === 'function') {
-                    config.onSuccess(userData);
-                }
-
-                // URLハッシュをクリア
-                window.history.replaceState({}, document.title, window.location.pathname);
-            }
-        })
-        .catch(err => {
-            console.error('Discord API Fetch failed:', err);
-            showToast('Discordユーザー情報の取得に失敗しました', 'system');
-        });
-    }
 }
