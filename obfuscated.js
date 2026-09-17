@@ -1313,13 +1313,21 @@ function updateVolumeIcon() {
 }
 
 // ====================================================================================
-// Discord OAuth2 ログイン機能（パターンA: child_script.js の設定を優先読み込み）
+// Discord OAuth2 ログイン機能（ダイレクトOAuth2認可ページ遷移保証）
 // ====================================================================================
 
 function getDiscordConfig() {
     const childConfig = window.CHILD_DISCORD_CONFIG || {};
+    const defaultClientId = "1546182857364607076";
+    
+    const clientId = childConfig.clientId 
+        || window.CHILD_DISCORD_CLIENT_ID 
+        || window.DISCORD_CLIENT_ID 
+        || getStoredData('discord_client_id', '') 
+        || defaultClientId;
+
     return {
-        clientId: childConfig.clientId || getStoredData('discord_client_id', window.CHILD_DISCORD_CLIENT_ID || window.DISCORD_CLIENT_ID || ""),
+        clientId: (clientId && clientId.trim() !== "") ? clientId.trim() : defaultClientId,
         scope: childConfig.scope || "identify email",
         onSuccess: childConfig.onSuccess || null
     };
@@ -1335,29 +1343,33 @@ function setDiscordClientId(id) {
 }
 
 /**
- * バックエンドなしで動作するDiscordログイン処理
+ * ボタン押下時に確実に Discord OAuth2 認証ページ（認可リンク）へ直接ジャンプさせる処理
  */
-function loginWithDiscord() {
+function loginWithDiscord(e) {
+    if (e && typeof e.preventDefault === 'function') {
+        e.preventDefault();
+    }
+    
     try {
         const config = getDiscordConfig();
-
-        if (config.clientId && config.clientId.trim() !== "" && config.clientId !== "YOUR_DISCORD_CLIENT_ID_HERE") {
-            const redirectUri = window.location.origin + window.location.pathname;
-            const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(config.clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(config.scope)}`;
-            
-            showToast("Discordログイン画面へ移動します...", "system");
-            setTimeout(() => {
-                window.location.href = authUrl;
-            }, 300);
-            return;
-        }
-
-        // Client IDが指定されていない場合はモーダルを表示
-        openDiscordModal();
-
+        
+        // ハッシュや不要なパラメータを除去したクリーンなリダイレクトURI
+        const redirectUri = window.location.origin + window.location.pathname;
+        
+        // Discord 公式 OAuth2 認可 URL
+        const authUrl = `https://discord.com/oauth2/authorize?client_id=${encodeURIComponent(config.clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(config.scope)}`;
+        
+        console.log("Directing to Discord OAuth2:", authUrl);
+        
+        // 即座にジャンプ
+        window.location.href = authUrl;
     } catch (err) {
-        console.error("Discord login error:", err);
-        quickDiscordLogin();
+        console.error("Discord login redirect failed:", err);
+        
+        // 万が一の例外発生時もフォールバック用URLで直接ジャンプを徹底
+        const fallbackId = "1546182857364607076";
+        const redirectUri = window.location.origin + window.location.pathname;
+        window.location.href = `https://discord.com/oauth2/authorize?client_id=${fallbackId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=identify%20email`;
     }
 }
 
@@ -1396,7 +1408,7 @@ function openDiscordModal() {
 
                 <div class="space-y-2">
                     <input type="text" id="customDiscordClientId" placeholder="Discord Client IDを入力" class="w-full bg-brandBg border border-brandBorder rounded-xl px-3 py-2 text-xs text-brandText focus:outline-none focus:border-indigo-500">
-                    <button onclick="saveAndOAuthDiscord()" class="w-full py-2 bg-brandBg hover:bg-brandBorder text-brandText border border-brandBorder rounded-xl font-bold text-xs transition-all cursor-pointer">
+                    <button onclick="saveAndOAuthDiscord(event)" class="w-full py-2 bg-brandBg hover:bg-brandBorder text-brandText border border-brandBorder rounded-xl font-bold text-xs transition-all cursor-pointer">
                         OAuth2 認証画面へ進む
                     </button>
                 </div>
@@ -1427,7 +1439,7 @@ function quickDiscordLogin() {
     }
 }
 
-function saveAndOAuthDiscord() {
+function saveAndOAuthDiscord(e) {
     const input = document.getElementById('customDiscordClientId');
     const id = input ? input.value.trim() : '';
     if (!id) {
@@ -1436,7 +1448,7 @@ function saveAndOAuthDiscord() {
     }
     setDiscordClientId(id);
     closeDiscordModal();
-    loginWithDiscord();
+    loginWithDiscord(e);
 }
 
 /**
