@@ -48,14 +48,15 @@ function updateNotificationCategory(category, value) {
 function filterNotificationItems() {
     const input = document.getElementById('notifSearchInput');
     const clearBtn = document.getElementById('notifSearchClearBtn');
+    if (!input) return;
     const query = input.value.trim().toLowerCase();
     const items = document.querySelectorAll('.notif-item');
     let matchCount = 0;
 
     if (query.length > 0) {
-        clearBtn.classList.remove('hidden');
+        if (clearBtn) clearBtn.classList.remove('hidden');
     } else {
-        clearBtn.classList.add('hidden');
+        if (clearBtn) clearBtn.classList.add('hidden');
     }
 
     items.forEach(item => {
@@ -73,10 +74,12 @@ function filterNotificationItems() {
     });
 
     const noMatchMsg = document.getElementById('noNotifMatchMsg');
-    if (matchCount === 0) {
-        noMatchMsg.classList.remove('hidden');
-    } else {
-        noMatchMsg.classList.add('hidden');
+    if (noMatchMsg) {
+        if (matchCount === 0) {
+            noMatchMsg.classList.remove('hidden');
+        } else {
+            noMatchMsg.classList.add('hidden');
+        }
     }
 }
 
@@ -104,11 +107,13 @@ function openNotificationSettingsModal() {
         if (checkbox) checkbox.checked = !!notificationSettings[cat];
     });
     clearNotifSearch();
-    document.getElementById('notificationSettingsModal').classList.remove('hidden');
+    const modal = document.getElementById('notificationSettingsModal');
+    if (modal) modal.classList.remove('hidden');
 }
 
 function closeNotificationSettingsModal() {
-    document.getElementById('notificationSettingsModal').classList.add('hidden');
+    const modal = document.getElementById('notificationSettingsModal');
+    if (modal) modal.classList.add('hidden');
 }
 
 function updateAppConfig(key, value) {
@@ -416,12 +421,14 @@ function openHistoryModal() {
             container.appendChild(el);
         });
     }
-    document.getElementById('historyModal').classList.remove('hidden');
+    const modal = document.getElementById('historyModal');
+    if (modal) modal.classList.remove('hidden');
     if (window.lucide) lucide.createIcons();
 }
 
 function closeHistoryModal() {
-    document.getElementById('historyModal').classList.add('hidden');
+    const modal = document.getElementById('historyModal');
+    if (modal) modal.classList.add('hidden');
 }
 
 function clearHistory() {
@@ -485,7 +492,8 @@ function openWatchLaterModal() {
             container.appendChild(el);
         });
     }
-    document.getElementById('watchLaterModal').classList.remove('hidden');
+    const modal = document.getElementById('watchLaterModal');
+    if (modal) modal.classList.remove('hidden');
     if (window.lucide) lucide.createIcons();
 }
 
@@ -503,14 +511,17 @@ function removeFromWatchLater(id, e) {
 }
 
 function closeWatchLaterModal() {
-    document.getElementById('watchLaterModal').classList.add('hidden');
+    const modal = document.getElementById('watchLaterModal');
+    if (modal) modal.classList.add('hidden');
 }
 
 function showShortcutsModal() {
-    document.getElementById('shortcutsModal').classList.remove('hidden');
+    const modal = document.getElementById('shortcutsModal');
+    if (modal) modal.classList.remove('hidden');
 }
 function closeShortcutsModal() {
-    document.getElementById('shortcutsModal').classList.add('hidden');
+    const modal = document.getElementById('shortcutsModal');
+    if (modal) modal.classList.add('hidden');
 }
 
 function openSettings() {
@@ -543,6 +554,7 @@ function renderExternalLinks() {
         const linkEl = document.createElement("a");
         linkEl.href = link.url;
         linkEl.target = "_blank";
+        linkEl.rel = "noopener noreferrer";
         linkEl.title = `${link.title}へ移動`;
         linkEl.className = "orbit-btn-wrapper flex-shrink-0 active:scale-95 transition-all cursor-pointer";
 
@@ -1313,7 +1325,7 @@ function updateVolumeIcon() {
 }
 
 // ====================================================================================
-// Discord OAuth2 ログイン機能（ダイレクトOAuth2認可ページ遷移保証）
+// Discord OAuth2 ログイン機能（ダイレクトOAuth2認可ページ遷移・堅牢化対応）
 // ====================================================================================
 
 function getDiscordConfig() {
@@ -1343,33 +1355,48 @@ function setDiscordClientId(id) {
 }
 
 /**
+ * Discord OAuth2 URL を生成するヘルパー関数
+ */
+function buildDiscordAuthUrl() {
+    const config = getDiscordConfig();
+    const redirectUri = window.location.origin + window.location.pathname;
+    return `https://discord.com/oauth2/authorize?client_id=${encodeURIComponent(config.clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(config.scope)}`;
+}
+
+/**
  * ボタン押下時に確実に Discord OAuth2 認証ページ（認可リンク）へ直接ジャンプさせる処理
  */
 function loginWithDiscord(e) {
-    if (e && typeof e.preventDefault === 'function') {
-        e.preventDefault();
+    if (e) {
+        if (typeof e.preventDefault === 'function') e.preventDefault();
+        if (typeof e.stopPropagation === 'function') e.stopPropagation();
     }
     
     try {
-        const config = getDiscordConfig();
-        
-        // ハッシュや不要なパラメータを除去したクリーンなリダイレクトURI
-        const redirectUri = window.location.origin + window.location.pathname;
-        
-        // Discord 公式 OAuth2 認可 URL
-        const authUrl = `https://discord.com/oauth2/authorize?client_id=${encodeURIComponent(config.clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(config.scope)}`;
-        
+        const authUrl = buildDiscordAuthUrl();
         console.log("Directing to Discord OAuth2:", authUrl);
         
-        // 即座にジャンプ
-        window.location.href = authUrl;
+        // iframe 内で実行されている場合と通常の最上位ブラウザ環境を判定して分岐
+        if (window.top && window.top !== window) {
+            // iframe 内の場合は親ウィンドウ（最上位）をジャンプさせる
+            window.top.location.href = authUrl;
+        } else {
+            // 通常のページ遷移
+            window.location.href = authUrl;
+        }
     } catch (err) {
-        console.error("Discord login redirect failed:", err);
+        console.error("Discord login redirect failed, trying fallback method:", err);
         
-        // 万が一の例外発生時もフォールバック用URLで直接ジャンプを徹底
-        const fallbackId = "1546182857364607076";
-        const redirectUri = window.location.origin + window.location.pathname;
-        window.location.href = `https://discord.com/oauth2/authorize?client_id=${fallbackId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=identify%20email`;
+        // window.location がブロックされた場合のフォールバック（window.open）
+        try {
+            const authUrl = buildDiscordAuthUrl();
+            const newWindow = window.open(authUrl, '_self');
+            if (!newWindow) {
+                window.location.assign(authUrl);
+            }
+        } catch (e2) {
+            showToast("リンクへの移動に失敗しました。直接ボタンのURLを確認してください。", "system");
+        }
     }
 }
 
@@ -1392,30 +1419,42 @@ function openDiscordModal() {
                 </div>
                 
                 <p class="text-xs text-brandMuted leading-relaxed">
-                    サーバー（バックエンド）不要で動作します。「クイックログイン」を押すと即座にログイン可能です。
+                    Discordでログインするとアカウント情報を連携できます。
                 </p>
 
-                <button onclick="quickDiscordLogin()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer">
-                    <i data-lucide="log-in" class="w-4 h-4"></i>
-                    <span>Discordでクイックログイン</span>
+                <!-- 確実に直リンクで飛ばすための <a> タグ仕様 -->
+                <a id="discordDirectAuthLink" href="#" target="_top" onclick="loginWithDiscord(event)" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer no-underline block text-center">
+                    <i data-lucide="log-in" class="w-4 h-4 inline-block"></i>
+                    <span>Discordでログインする</span>
+                </a>
+
+                <button onclick="quickDiscordLogin()" class="w-full py-2 bg-brandBg hover:bg-brandBorder text-brandMuted hover:text-brandText border border-brandBorder rounded-xl font-bold text-xs transition-all cursor-pointer">
+                    ゲストでクイックログイン
                 </button>
 
                 <div class="relative flex py-1 items-center">
                     <div class="flex-grow border-t border-brandBorder"></div>
-                    <span class="flex-shrink mx-2 text-[10px] text-brandMuted">または Client ID を保存して連携</span>
+                    <span class="flex-shrink mx-2 text-[10px] text-brandMuted">または Client ID を変更</span>
                     <div class="flex-grow border-t border-brandBorder"></div>
                 </div>
 
                 <div class="space-y-2">
                     <input type="text" id="customDiscordClientId" placeholder="Discord Client IDを入力" class="w-full bg-brandBg border border-brandBorder rounded-xl px-3 py-2 text-xs text-brandText focus:outline-none focus:border-indigo-500">
                     <button onclick="saveAndOAuthDiscord(event)" class="w-full py-2 bg-brandBg hover:bg-brandBorder text-brandText border border-brandBorder rounded-xl font-bold text-xs transition-all cursor-pointer">
-                        OAuth2 認証画面へ進む
+                        Client IDを保存して認証画面へ
                     </button>
                 </div>
             </div>
         `;
         document.body.appendChild(modal);
     }
+    
+    // ダイレクトリンクの href を最新URLに更新
+    const directLink = document.getElementById('discordDirectAuthLink');
+    if (directLink) {
+        directLink.href = buildDiscordAuthUrl();
+    }
+    
     modal.classList.remove('hidden');
     if (window.lucide) lucide.createIcons();
 }
