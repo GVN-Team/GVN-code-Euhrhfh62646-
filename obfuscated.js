@@ -1,7 +1,7 @@
 // ====================================================================================
-// アプリ固有のID（child_script.jsで先に定義されていればそれを優先）
+// アプリ固有のID
+window.APP_UNIQUE_ID = "SiteLikes";
 // ====================================================================================
-window.APP_UNIQUE_ID = window.APP_UNIQUE_ID || "SiteLikes";
 
 // 固有の接頭辞を作成
 const STORAGE_PREFIX = window.APP_UNIQUE_ID + "_";
@@ -48,15 +48,14 @@ function updateNotificationCategory(category, value) {
 function filterNotificationItems() {
     const input = document.getElementById('notifSearchInput');
     const clearBtn = document.getElementById('notifSearchClearBtn');
-    if (!input) return;
     const query = input.value.trim().toLowerCase();
     const items = document.querySelectorAll('.notif-item');
     let matchCount = 0;
 
     if (query.length > 0) {
-        if (clearBtn) clearBtn.classList.remove('hidden');
+        clearBtn.classList.remove('hidden');
     } else {
-        if (clearBtn) clearBtn.classList.add('hidden');
+        clearBtn.classList.add('hidden');
     }
 
     items.forEach(item => {
@@ -74,18 +73,16 @@ function filterNotificationItems() {
     });
 
     const noMatchMsg = document.getElementById('noNotifMatchMsg');
-    if (noMatchMsg) {
-        if (matchCount === 0) {
-            noMatchMsg.classList.remove('hidden');
-        } else {
-            noMatchMsg.classList.add('hidden');
-        }
+    if (matchCount === 0) {
+        noMatchMsg.classList.remove('hidden');
+    } else {
+        noMatchMsg.classList.add('hidden');
     }
 }
 
 function clearNotifSearch() {
     const input = document.getElementById('notifSearchInput');
-    if (input) input.value = '';
+    input.value = '';
     filterNotificationItems();
 }
 
@@ -107,13 +104,11 @@ function openNotificationSettingsModal() {
         if (checkbox) checkbox.checked = !!notificationSettings[cat];
     });
     clearNotifSearch();
-    const modal = document.getElementById('notificationSettingsModal');
-    if (modal) modal.classList.remove('hidden');
+    document.getElementById('notificationSettingsModal').classList.remove('hidden');
 }
 
 function closeNotificationSettingsModal() {
-    const modal = document.getElementById('notificationSettingsModal');
-    if (modal) modal.classList.add('hidden');
+    document.getElementById('notificationSettingsModal').classList.add('hidden');
 }
 
 function updateAppConfig(key, value) {
@@ -128,12 +123,8 @@ const dummyLocalDB = [
     { username: "UserName The ggrks", password: "Password The Annan" }
 ];
 
-if (Array.isArray(window.CHILD_DUMMY_DB)) {
-    dummyLocalDB.push(...window.CHILD_DUMMY_DB);
-}
-
-const externalLinks = window.CHILD_EXTERNAL_LINKS || [
-    { no: 1, title: "Likes", url: "https://jcandjk-muryouhaihu-jsjdjxj7273jjsk.onrender.com", icon: "globe", color: "white", borderColor: "#5865F2" }
+const externalLinks = [
+    { no: 1, title: "Likes", url: "https://gvn-team.github.io/Likes-Vm1wR2IxWXlUblJTYkdoUFYwWndZVlJYTVc5aU1XeDBXWHBzVVZWVU1Eaz0-/", icon: "", color: "white", borderColor: "red" }
 ];
 
 let currentUser = null;
@@ -142,15 +133,9 @@ let userWatchLater = [];
 let userResumeTimes = {};
 
 window.onload = function() {
-    if (window.lucide) lucide.createIcons();
-    
-    // child_script.js 側の Discord リダイレクト処理を実行
-    if (typeof handleDiscordOAuthCallback === 'function') {
-        handleDiscordOAuthCallback();
-    }
-
+    lucide.createIcons();
     const savedUser = getStoredData('session_user', null);
-    if (savedUser && !currentUser) {
+    if (savedUser) {
         applyLoginState(savedUser);
     }
     setupKeyboardShortcuts();
@@ -171,7 +156,6 @@ let dotInterval;
 function startDots() {
     let count = 0;
     const dotsEl = document.getElementById('loadingDots');
-    if (!dotsEl) return;
     dotInterval = setInterval(() => {
         count = (count % 3) + 1;
         dotsEl.textContent = ".".repeat(count);
@@ -179,7 +163,7 @@ function startDots() {
 }
 
 async function handleLogin(event) {
-    if (event) event.preventDefault();
+    event.preventDefault();
     const userInp = document.getElementById('userId');
     const passInp = document.getElementById('userPwd');
     const errBox = document.getElementById('loginError');
@@ -187,18 +171,16 @@ async function handleLogin(event) {
     const loadArea = document.getElementById('loadingArea');
     const loadMsg = document.getElementById('loadingMsg');
 
-    if (errBox) errBox.classList.add('hidden');
-    if (btnArea) btnArea.classList.add('hidden');
-    if (loadArea) {
-        loadArea.classList.remove('hidden');
-        loadArea.classList.add('flex');
-    }
+    errBox.classList.add('hidden');
+    btnArea.classList.add('hidden');
+    loadArea.classList.remove('hidden');
+    loadArea.classList.add('flex');
 
     startDots();
     
     const steps = 3; 
     for (let i = 0; i < steps; i++) {
-        if (loadMsg) loadMsg.textContent = loaderMessages[Math.floor(Math.random() * loaderMessages.length)];
+        loadMsg.textContent = loaderMessages[Math.floor(Math.random() * loaderMessages.length)];
         await new Promise(r => setTimeout(r, 400));
     }
 
@@ -207,7 +189,7 @@ async function handleLogin(event) {
         const remoteRes = await fetch("https://github.com/Minecraft-jp/------/raw/refs/heads/main/-", { mode: 'cors' });
         if (remoteRes.ok) {
             const remoteData = await remoteRes.json();
-            if (Array.isArray(remoteData)) targetDB = remoteData.concat(dummyLocalDB);
+            if (Array.isArray(remoteData)) targetDB = remoteData;
         }
     } catch (e) {
         targetDB = dummyLocalDB;
@@ -221,17 +203,12 @@ async function handleLogin(event) {
         setStoredData('session_user', foundUser.username);
         applyLoginState(foundUser.username);
     } else {
-        if (userInp) userInp.value = "";
-        if (passInp) passInp.value = "";
-        if (loadArea) {
-            loadArea.classList.add('hidden');
-            loadArea.classList.remove('flex');
-        }
-        if (btnArea) btnArea.classList.remove('hidden');
-        if (errBox) {
-            errBox.classList.remove('hidden'); errBox.classList.add('flex');
-        }
-        if (window.lucide) lucide.createIcons();
+        userInp.value = ""; passInp.value = "";
+        loadArea.classList.add('hidden');
+        loadArea.classList.remove('flex');
+        btnArea.classList.remove('hidden');
+        errBox.classList.remove('hidden'); errBox.classList.add('flex');
+        lucide.createIcons();
     }
 }
 
@@ -248,20 +225,12 @@ function applyLoginState(username) {
         syncUserDataFromCloud(); 
     }
 
-    const headerUsername = document.getElementById('headerUsername');
-    if (headerUsername) headerUsername.textContent = username;
-    
-    const loginScreen = document.getElementById('loginScreen');
-    if (loginScreen) {
-        loginScreen.classList.add('hidden');
-        loginScreen.classList.remove('flex');
-    }
-    
+    document.getElementById('headerUsername').textContent = username;
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('loginScreen').classList.remove('flex');
     const mainContent = document.getElementById('mainContent');
-    if (mainContent) {
-        mainContent.classList.remove('hidden');
-        mainContent.classList.add('flex');
-    }
+    mainContent.classList.remove('hidden');
+    mainContent.classList.add('flex');
     initPlayer();
 }
 
@@ -316,7 +285,7 @@ async function saveUserDataToCloud() {
 function toggleUserMenu(e) {
     if (e) e.stopPropagation();
     const menu = document.getElementById('userMenuDropdown');
-    if (menu) menu.classList.toggle('hidden');
+    menu.classList.toggle('hidden');
 }
 
 function closeUserMenu() {
@@ -341,28 +310,16 @@ function logout() {
         player.src = "";
     }
     
-    const mainContent = document.getElementById('mainContent');
-    if (mainContent) {
-        mainContent.classList.add('hidden');
-        mainContent.classList.remove('flex');
-    }
-    const loginScreen = document.getElementById('loginScreen');
-    if (loginScreen) {
-        loginScreen.classList.remove('hidden');
-        loginScreen.classList.add('flex');
-    }
+    document.getElementById('mainContent').classList.add('hidden');
+    document.getElementById('mainContent').classList.remove('flex');
+    document.getElementById('loginScreen').classList.remove('hidden');
+    document.getElementById('loginScreen').classList.add('flex');
     
-    const userId = document.getElementById('userId');
-    const userPwd = document.getElementById('userPwd');
-    if (userId) userId.value = "";
-    if (userPwd) userPwd.value = "";
-    
-    const loadingArea = document.getElementById('loadingArea');
-    const loginBtnContainer = document.getElementById('loginBtnContainer');
-    const loginError = document.getElementById('loginError');
-    if (loadingArea) loadingArea.classList.add('hidden');
-    if (loginBtnContainer) loginBtnContainer.classList.remove('hidden');
-    if (loginError) loginError.classList.add('hidden');
+    document.getElementById('userId').value = "";
+    document.getElementById('userPwd').value = "";
+    document.getElementById('loadingArea').classList.add('hidden');
+    document.getElementById('loginBtnContainer').classList.remove('hidden');
+    document.getElementById('loginError').classList.add('hidden');
     
     showToast("ログアウトしました", "system");
 }
@@ -371,7 +328,7 @@ document.addEventListener('click', (e) => {
     const userMenu = document.getElementById('userMenuDropdown');
     const userBtn = document.getElementById('userMenuBtn');
     if (userMenu && !userMenu.classList.contains('hidden')) {
-        if (!userMenu.contains(e.target) && userBtn && !userBtn.contains(e.target)) {
+        if (!userMenu.contains(e.target) && !userBtn.contains(e.target)) {
             userMenu.classList.add('hidden');
         }
     }
@@ -379,7 +336,7 @@ document.addEventListener('click', (e) => {
     const sortDropdown = document.getElementById('sortDropdown');
     const sortBtn = document.getElementById('sortBtn');
     if (sortDropdown && !sortDropdown.classList.contains('hidden')) {
-        if (!sortDropdown.contains(e.target) && sortBtn && !sortBtn.contains(e.target)) {
+        if (!sortDropdown.contains(e.target) && !sortBtn.contains(e.target)) {
             sortDropdown.classList.add('hidden');
         }
     }
@@ -396,7 +353,6 @@ function recordHistory(videoId) {
 
 function openHistoryModal() {
     const container = document.getElementById('historyListContainer');
-    if (!container) return;
     container.innerHTML = "";
     if (userWatchHistory.length === 0) {
         container.innerHTML = `<p class="text-xs text-brandMuted text-center py-8">視聴履歴はありません</p>`;
@@ -423,14 +379,12 @@ function openHistoryModal() {
             container.appendChild(el);
         });
     }
-    const modal = document.getElementById('historyModal');
-    if (modal) modal.classList.remove('hidden');
-    if (window.lucide) lucide.createIcons();
+    document.getElementById('historyModal').classList.remove('hidden');
+    lucide.createIcons();
 }
 
 function closeHistoryModal() {
-    const modal = document.getElementById('historyModal');
-    if (modal) modal.classList.add('hidden');
+    document.getElementById('historyModal').classList.add('hidden');
 }
 
 function clearHistory() {
@@ -458,18 +412,16 @@ function toggleWatchLater() {
 function updateWatchLaterBtnUI() {
     const isAdded = userWatchLater.includes(activeId);
     const btn = document.getElementById('watchLaterBtn');
-    if (!btn) return;
     if (isAdded) {
         btn.innerHTML = `<i data-lucide="bookmark" class="w-5 h-5 text-amber-400 fill-amber-400"></i>`;
     } else {
         btn.innerHTML = `<i data-lucide="bookmark" class="w-5 h-5 text-amber-400 fill-transparent"></i>`;
     }
-    if (window.lucide) lucide.createIcons();
+    lucide.createIcons();
 }
 
 function openWatchLaterModal() {
     const container = document.getElementById('watchLaterListContainer');
-    if (!container) return;
     container.innerHTML = "";
     if (userWatchLater.length === 0) {
         container.innerHTML = `<p class="text-xs text-brandMuted text-center py-8">「あとで見る」リストは空です</p>`;
@@ -494,9 +446,8 @@ function openWatchLaterModal() {
             container.appendChild(el);
         });
     }
-    const modal = document.getElementById('watchLaterModal');
-    if (modal) modal.classList.remove('hidden');
-    if (window.lucide) lucide.createIcons();
+    document.getElementById('watchLaterModal').classList.remove('hidden');
+    lucide.createIcons();
 }
 
 function removeFromWatchLater(id, e) {
@@ -513,34 +464,28 @@ function removeFromWatchLater(id, e) {
 }
 
 function closeWatchLaterModal() {
-    const modal = document.getElementById('watchLaterModal');
-    if (modal) modal.classList.add('hidden');
+    document.getElementById('watchLaterModal').classList.add('hidden');
 }
 
 function showShortcutsModal() {
-    const modal = document.getElementById('shortcutsModal');
-    if (modal) modal.classList.remove('hidden');
+    document.getElementById('shortcutsModal').classList.remove('hidden');
 }
 function closeShortcutsModal() {
-    const modal = document.getElementById('shortcutsModal');
-    if (modal) modal.classList.add('hidden');
+    document.getElementById('shortcutsModal').classList.add('hidden');
 }
 
 function openSettings() {
     const modal = document.getElementById('settingsModal');
     const content = document.getElementById('settingsModalContent');
-    if (!modal || !content) return;
     modal.classList.remove('hidden');
     setTimeout(() => {
         modal.classList.remove('opacity-0');
         content.classList.remove('scale-95'); content.classList.add('scale-100');
     }, 10);
 }
-
 function closeSettings() {
     const modal = document.getElementById('settingsModal');
     const content = document.getElementById('settingsModalContent');
-    if (!modal || !content) return;
     modal.classList.add('opacity-0');
     content.classList.remove('scale-100'); content.classList.add('scale-95');
     setTimeout(() => modal.classList.add('hidden'), 300);
@@ -548,16 +493,13 @@ function closeSettings() {
 
 function renderExternalLinks() {
     const container = document.getElementById("linksList");
-    if (!container) return;
     container.innerHTML = "";
-    const currentExternalLinks = window.CHILD_EXTERNAL_LINKS || externalLinks;
-    const sortedLinks = [...currentExternalLinks].sort((a, b) => a.no - b.no);
+    const sortedLinks = [...externalLinks].sort((a, b) => a.no - b.no);
 
     sortedLinks.forEach((link) => {
         const linkEl = document.createElement("a");
         linkEl.href = link.url;
         linkEl.target = "_blank";
-        linkEl.rel = "noopener noreferrer";
         linkEl.title = `${link.title}へ移動`;
         linkEl.className = "orbit-btn-wrapper flex-shrink-0 active:scale-95 transition-all cursor-pointer";
 
@@ -583,10 +525,10 @@ function renderExternalLinks() {
         `;
         container.appendChild(linkEl);
     });
-    if (window.lucide) lucide.createIcons();
+    lucide.createIcons();
 }
 
-const videos = window.CHILD_VIDEOS || [
+const videos = [
     { id: 1, 
         type: "video",
         title: "おすすめ", 
@@ -616,10 +558,9 @@ const playlistContainer = document.getElementById("playlist");
 const videoSpinner = document.getElementById("videoSpinner");
 
 function initPlayer() {
-    const activeVideos = window.CHILD_VIDEOS || videos;
     const params = new URLSearchParams(window.location.search);
     const vParam = parseInt(params.get('v'));
-    if (vParam && activeVideos.find(v => v.id === vParam)) { activeId = vParam; } else { activeId = 1; }
+    if (vParam && videos.find(v => v.id === vParam)) { activeId = vParam; } else { activeId = 1; }
     
     const originalAutoPlay = appConfig.autoPlay;
     appConfig.autoPlay = false; 
@@ -628,11 +569,11 @@ function initPlayer() {
     
     renderPlaylist();
     renderExternalLinks(); 
-    if (window.lucide) lucide.createIcons();
+    lucide.createIcons();
     setupPlayerEventListeners();
     updateVolumeBarUI(100);
     
-    if (player) player.playbackRate = appConfig.playbackRate;
+    player.playbackRate = appConfig.playbackRate;
 }
 
 function formatHashtags(text) {
@@ -650,21 +591,18 @@ function formatHashtags(text) {
 
 function filterByTagText(tagText) {
     const input = document.getElementById("searchInput");
-    if (input) {
-        input.value = tagText;
-        handleSearch();
-    }
+    input.value = tagText;
+    handleSearch();
 }
 
 function loadMedia(id) {
-    const activeVideos = window.CHILD_VIDEOS || videos;
-    const v = activeVideos.find(item => item.id === id);
+    const v = videos.find(item => item.id === id);
     if (!v) return;
     activeId = id;
     
-    if (vTitle) vTitle.textContent = v.title;
-    if (vDate) vDate.textContent = `公開日: ${v.date}`;
-    if (vDesc) vDesc.innerHTML = formatHashtags(v.desc);
+    vTitle.textContent = v.title;
+    vDate.textContent = `公開日: ${v.date}`;
+    vDesc.innerHTML = formatHashtags(v.desc);
     renderPlaylist();
     updateWatchLaterBtnUI();
     recordHistory(v.id);
@@ -675,42 +613,35 @@ function loadMedia(id) {
 
     if (v.type === 'image' || v.images) {
         if (player) player.pause();
-        if (player) player.classList.add('hidden');
-        if (controls) controls.classList.add('hidden');
-        if (touchOverlay) touchOverlay.classList.add('hidden');
+        player.classList.add('hidden');
+        controls.classList.add('hidden');
+        touchOverlay.classList.add('hidden');
         
-        if (imageViewer) {
-            imageViewer.classList.remove('hidden');
-            imageViewer.classList.add('flex');
-        }
+        imageViewer.classList.remove('hidden');
+        imageViewer.classList.add('flex');
         
         setupImageViewer(v.images);
     } else {
-        if (imageViewer) {
-            imageViewer.classList.add('hidden');
-            imageViewer.classList.remove('flex');
-        }
+        imageViewer.classList.add('hidden');
+        imageViewer.classList.remove('flex');
         
-        if (player) player.classList.remove('hidden');
-        if (controls) controls.classList.remove('hidden');
-        if (touchOverlay) touchOverlay.classList.remove('hidden');
+        player.classList.remove('hidden');
+        controls.classList.remove('hidden');
+        touchOverlay.classList.remove('hidden');
 
-        if (playerSrc) playerSrc.src = v.url;
-        if (player) {
-            player.poster = v.thumbnail;
-            player.load();
-            player.playbackRate = appConfig.playbackRate;
-        }
-        if (videoSpinner) videoSpinner.classList.remove("hidden");
+        playerSrc.src = v.url;
+        player.poster = v.thumbnail;
+        player.load();
+        
+        player.playbackRate = appConfig.playbackRate;
+        videoSpinner.classList.remove("hidden");
         updateSeekBarUI(0);
 
         const savedTime = userResumeTimes[v.id] || 0;
         if (savedTime > 5) {
             pendingResumeTime = savedTime;
-            const resumeText = document.getElementById('resumeTimeText');
-            if (resumeText) resumeText.textContent = `再生位置: ${formatTime(savedTime)}`;
-            const resumeModal = document.getElementById('resumeModal');
-            if (resumeModal) resumeModal.classList.remove('hidden');
+            document.getElementById('resumeTimeText').textContent = `再生位置: ${formatTime(savedTime)}`;
+            document.getElementById('resumeModal').classList.remove('hidden');
         } else {
             startVideoPlayback();
         }
@@ -721,28 +652,26 @@ let currentImageIndex = 0;
 let currentImages = [];
 
 function setupImageViewer(images) {
-    if (!images) return;
     currentImages = images;
     currentImageIndex = 0;
     
     const track = document.getElementById('imageTrack');
     const indicators = document.getElementById('imageIndicators');
-    const totalNum = document.getElementById('totalImgNum');
-    if (totalNum) totalNum.textContent = images.length;
+    document.getElementById('totalImgNum').textContent = images.length;
     
-    if (track) track.innerHTML = '';
-    if (indicators) indicators.innerHTML = '';
+    track.innerHTML = '';
+    indicators.innerHTML = '';
     
     images.forEach((src, idx) => {
         const img = document.createElement('img');
         img.src = src;
         img.className = 'w-full h-full object-contain flex-shrink-0 select-none';
         img.ondragstart = () => false;
-        if (track) track.appendChild(img);
+        track.appendChild(img);
         
         const dot = document.createElement('div');
         dot.className = `h-2 rounded-full transition-all duration-300 ${idx === 0 ? 'bg-brandAccent w-4' : 'bg-white/50 w-2'}`;
-        if (indicators) indicators.appendChild(dot);
+        indicators.appendChild(dot);
     });
     
     updateImageViewer();
@@ -750,27 +679,21 @@ function setupImageViewer(images) {
 
 function updateImageViewer() {
     const track = document.getElementById('imageTrack');
-    if (track) track.style.transform = `translateX(-${currentImageIndex * 100}%)`;
+    track.style.transform = `translateX(-${currentImageIndex * 100}%)`;
     
-    const currentNum = document.getElementById('currentImgNum');
-    if (currentNum) currentNum.textContent = currentImageIndex + 1;
+    document.getElementById('currentImgNum').textContent = currentImageIndex + 1;
     
-    const indicators = document.getElementById('imageIndicators');
-    if (indicators) {
-        const dots = indicators.children;
-        for (let i = 0; i < dots.length; i++) {
-            if (i === currentImageIndex) {
-                dots[i].className = 'h-2 rounded-full bg-brandAccent transition-all duration-300 w-4';
-            } else {
-                dots[i].className = 'h-2 rounded-full bg-white/50 transition-all duration-300 w-2';
-            }
+    const dots = document.getElementById('imageIndicators').children;
+    for (let i = 0; i < dots.length; i++) {
+        if (i === currentImageIndex) {
+            dots[i].className = 'h-2 rounded-full bg-brandAccent transition-all duration-300 w-4';
+        } else {
+            dots[i].className = 'h-2 rounded-full bg-white/50 transition-all duration-300 w-2';
         }
     }
     
-    const prevBtn = document.getElementById('prevImgBtn');
-    const nextBtn = document.getElementById('nextImgBtn');
-    if (prevBtn) prevBtn.disabled = currentImageIndex === 0;
-    if (nextBtn) nextBtn.disabled = currentImageIndex === currentImages.length - 1;
+    document.getElementById('prevImgBtn').disabled = currentImageIndex === 0;
+    document.getElementById('nextImgBtn').disabled = currentImageIndex === currentImages.length - 1;
 }
 
 function prevImage(e) {
@@ -794,7 +717,6 @@ let touchEndX = 0;
 
 function setupImageSwipeEvents() {
     const viewer = document.getElementById('imageViewer');
-    if (!viewer) return;
     viewer.addEventListener('touchstart', (e) => {
         touchStartX = e.changedTouches[0].screenX;
     }, {passive: true});
@@ -817,31 +739,29 @@ function handleSwipe() {
 }
 
 function confirmResume(shouldResume) {
-    const modal = document.getElementById('resumeModal');
-    if (modal) modal.classList.add('hidden');
+    document.getElementById('resumeModal').classList.add('hidden');
     if (shouldResume && pendingResumeTime > 0) {
-        if (player) player.currentTime = pendingResumeTime;
+        player.currentTime = pendingResumeTime;
         showToast(`続きから再生 (${formatTime(pendingResumeTime)})`, 'resume');
     } else {
-        if (player) player.currentTime = 0;
+        player.currentTime = 0;
     }
     startVideoPlayback();
 }
 
 function startVideoPlayback() {
-    if (!player) return;
     if (appConfig.autoPlay) {
         player.play().then(() => {
-            if (playBtn) playBtn.innerHTML = `<i data-lucide="pause" class="w-6 h-6 fill-current"></i>`;
-            if (window.lucide) lucide.createIcons();
+            playBtn.innerHTML = `<i data-lucide="pause" class="w-6 h-6 fill-current"></i>`;
+            lucide.createIcons();
         }).catch((err) => {
-            if (playBtn) playBtn.innerHTML = `<i data-lucide="play" class="w-6 h-6 fill-current"></i>`;
-            if (window.lucide) lucide.createIcons();
+            playBtn.innerHTML = `<i data-lucide="play" class="w-6 h-6 fill-current"></i>`;
+            lucide.createIcons();
         });
     } else {
-        if (playBtn) playBtn.innerHTML = `<i data-lucide="play" class="w-6 h-6 fill-current"></i>`;
-        if (window.lucide) lucide.createIcons();
-        player.addEventListener('canplay', () => { if (videoSpinner) videoSpinner.classList.add("hidden"); }, {once:true});
+        playBtn.innerHTML = `<i data-lucide="play" class="w-6 h-6 fill-current"></i>`;
+        lucide.createIcons();
+        player.addEventListener('canplay', () => videoSpinner.classList.add("hidden"), {once:true});
     }
     resetControlsTimeout();
 }
@@ -859,21 +779,27 @@ function toggleTheaterMode() {
     const theaterBtn = document.getElementById("theaterBtn");
 
     if (isTheaterMode) {
-        if (grid) { grid.classList.remove("max-w-6xl"); grid.classList.add("max-w-7xl"); }
-        if (playerCol) { playerCol.classList.remove("lg:col-span-2"); playerCol.classList.add("lg:col-span-3"); }
-        if (theaterBtn) theaterBtn.innerHTML = `<i data-lucide="rectangle-vertical" class="w-5 h-5 text-brandAccent"></i>`;
+        grid.classList.remove("max-w-6xl");
+        grid.classList.add("max-w-7xl");
+        playerCol.classList.remove("lg:col-span-2");
+        playerCol.classList.add("lg:col-span-3");
+        
+        theaterBtn.innerHTML = `<i data-lucide="rectangle-vertical" class="w-5 h-5 text-brandAccent"></i>`;
         showToast("大画面モード: ON", 'system');
     } else {
-        if (grid) { grid.classList.remove("max-w-7xl"); grid.classList.add("max-w-6xl"); }
-        if (playerCol) { playerCol.classList.remove("lg:col-span-3"); playerCol.classList.add("lg:col-span-2"); }
-        if (theaterBtn) theaterBtn.innerHTML = `<i data-lucide="rectangle-horizontal" class="w-5 h-5"></i>`;
+        grid.classList.remove("max-w-7xl");
+        grid.classList.add("max-w-6xl");
+        playerCol.classList.remove("lg:col-span-3");
+        playerCol.classList.add("lg:col-span-2");
+        
+        theaterBtn.innerHTML = `<i data-lucide="rectangle-horizontal" class="w-5 h-5"></i>`;
         showToast("大画面モード: OFF", 'system');
     }
-    if (window.lucide) lucide.createIcons();
+    lucide.createIcons();
 }
 
 async function shareVideo() {
-    const finalShareUrl = `https://jcandjk-muryouhaihu-jsjdjxj7273jjsk.onrender.com/`;
+    const finalShareUrl = `https://gvn-team.github.io/Likes-Vm1wR2IxWXlUblJTYkdoUFYwWndZVlJYTVc5aU1XeDBXWHBzVVZWVU1Eaz0-/`;
     if (navigator.share) {
         try {
             await navigator.share({ title: "Likes - GVN", text: "Likes - GVN", url: finalShareUrl });
@@ -886,8 +812,7 @@ async function shareVideo() {
 }
 
 async function downloadMedia() {
-    const activeVideos = window.CHILD_VIDEOS || videos;
-    const v = activeVideos.find(item => item.id === activeId);
+    const v = videos.find(item => item.id === activeId);
     if (!v) return;
 
     if (v.type === 'image' || v.images) {
@@ -908,8 +833,7 @@ async function downloadMedia() {
     } else {
         const btn = document.getElementById("downloadBtn");
         const txt = document.getElementById("downloadBtnText");
-        if (btn) btn.disabled = true; 
-        if (txt) txt.textContent = "準備中...";
+        btn.disabled = true; txt.textContent = "準備中...";
         try {
             const res = await fetch(v.url);
             if (!res.ok) throw new Error();
@@ -920,7 +844,7 @@ async function downloadMedia() {
                 const {done, value} = await reader.read();
                 if (done) break;
                 chunks.push(value); rec += value.length;
-                if (len && txt) txt.textContent = `${Math.round((rec / len) * 100)}%`;
+                if (len) txt.textContent = `${Math.round((rec / len) * 100)}%`;
             }
             const blob = new Blob(chunks, { type: "video/mp4" });
             const blobUrl = URL.createObjectURL(blob);
@@ -931,45 +855,36 @@ async function downloadMedia() {
         } catch (e) {
             openDownloadModal(v.url);
         } finally {
-            if (btn) btn.disabled = false; 
-            if (txt) txt.textContent = "ダウンロード";
+            btn.disabled = false; txt.textContent = "ダウンロード";
         }
     }
 }
 
 function openDownloadModal(url) {
-    const modal = document.getElementById("downloadModal");
-    if (modal) modal.classList.remove("hidden");
-    const iph = document.getElementById("iphoneDirectLink");
-    const andr = document.getElementById("androidDirectLink");
-    if (iph) iph.href = url;
-    if (andr) andr.href = url;
+    document.getElementById("downloadModal").classList.remove("hidden");
+    document.getElementById("iphoneDirectLink").href = url;
+    document.getElementById("androidDirectLink").href = url;
 }
-function closeModal() { 
-    const modal = document.getElementById("downloadModal");
-    if (modal) modal.classList.add("hidden"); 
-}
+function closeModal() { document.getElementById("downloadModal").classList.add("hidden"); }
 
 function handleSearch() {
     const input = document.getElementById("searchInput");
     const clearBtn = document.getElementById("searchClearBtn");
-    if (!input) return;
     searchQuery = input.value.trim().toLowerCase();
 
     if (searchQuery.length > 0) {
-        if (clearBtn) clearBtn.classList.remove("hidden");
+        clearBtn.classList.remove("hidden");
     } else {
-        if (clearBtn) clearBtn.classList.add("hidden");
+        clearBtn.classList.add("hidden");
     }
     renderPlaylist();
 }
 
 function clearSearch() {
     const input = document.getElementById("searchInput");
-    if (input) input.value = "";
+    input.value = "";
     searchQuery = "";
-    const clearBtn = document.getElementById("searchClearBtn");
-    if (clearBtn) clearBtn.classList.add("hidden");
+    document.getElementById("searchClearBtn").classList.add("hidden");
     renderPlaylist();
 }
 
@@ -981,7 +896,6 @@ const sortOptions = [
 function toggleSortDropdown(e) {
     if (e) e.stopPropagation();
     const dropdown = document.getElementById("sortDropdown");
-    if (!dropdown) return;
     const isHidden = dropdown.classList.contains("hidden");
 
     if (isHidden) {
@@ -994,7 +908,6 @@ function toggleSortDropdown(e) {
 
 function renderSortDropdownItems() {
     const container = document.getElementById("sortDropdownList");
-    if (!container) return;
     container.innerHTML = "";
 
     sortOptions.forEach(opt => {
@@ -1010,26 +923,21 @@ function renderSortDropdownItems() {
         `;
         container.appendChild(btn);
     });
-    if (window.lucide) lucide.createIcons();
+    lucide.createIcons();
 }
 
 function selectSortOption(key) {
     currentSortOrder = key;
     const currentObj = sortOptions.find(o => o.key === key);
-    const label = document.getElementById("sortLabel");
-    if (label) label.textContent = currentObj ? currentObj.label : "新しい順";
-    const dropdown = document.getElementById("sortDropdown");
-    if (dropdown) dropdown.classList.add("hidden");
+    document.getElementById("sortLabel").textContent = currentObj ? currentObj.label : "新しい順";
+    document.getElementById("sortDropdown").classList.add("hidden");
     renderPlaylist();
 }
 
 function renderPlaylist() {
-    if (!playlistContainer) return;
     playlistContainer.innerHTML = "";
 
-    const activeVideos = window.CHILD_VIDEOS || videos;
-
-    let filtered = activeVideos.filter(v => {
+    let filtered = videos.filter(v => {
         if (!searchQuery) return true;
         const titleMatch = v.title.toLowerCase().includes(searchQuery);
         const descMatch = v.desc.toLowerCase().includes(searchQuery);
@@ -1049,7 +957,7 @@ function renderPlaylist() {
                 <i data-lucide="search-x" class="w-8 h-8 mx-auto opacity-50"></i>
                 <p class="text-xs font-bold">該当する動画が見つかりませんでした</p>
             </div>`;
-        if (window.lucide) lucide.createIcons();
+        lucide.createIcons();
         return;
     }
 
@@ -1075,13 +983,12 @@ function renderPlaylist() {
             </div>`;
         playlistContainer.appendChild(card);
     });
-    if (window.lucide) lucide.createIcons();
+    lucide.createIcons();
 }
 
 function setupDoubleTapGestures() {
     const leftZone = document.getElementById("leftTapZone");
     const rightZone = document.getElementById("rightTapZone");
-    if (!leftZone || !rightZone) return;
 
     let lastTapLeft = 0;
     let lastTapRight = 0;
@@ -1127,12 +1034,11 @@ function showRipple(id) {
 
 function toggleControlsVisibility() {
     const controls = document.getElementById("playerControls");
-    if (!controls) return;
     if (controls.classList.contains("opacity-0")) {
         controls.classList.remove("opacity-0", "pointer-events-none");
         resetControlsTimeout();
     } else {
-        if (player && !player.paused) {
+        if (!player.paused) {
             controls.classList.add("opacity-0", "pointer-events-none");
         }
     }
@@ -1140,10 +1046,9 @@ function toggleControlsVisibility() {
 
 function resetControlsTimeout() {
     const controls = document.getElementById("playerControls");
-    if (!controls) return;
     controls.classList.remove("opacity-0", "pointer-events-none");
     clearTimeout(controlsTimeout);
-    if (player && !player.paused) {
+    if (!player.paused) {
         controlsTimeout = setTimeout(() => {
             controls.classList.add("opacity-0", "pointer-events-none");
         }, 3000);
@@ -1152,7 +1057,6 @@ function resetControlsTimeout() {
 
 function setupAutoFadeControls() {
     const container = document.getElementById("videoContainer");
-    if (!container) return;
     container.addEventListener("mousemove", resetControlsTimeout);
     container.addEventListener("touchstart", resetControlsTimeout, { passive: true });
 }
@@ -1161,8 +1065,7 @@ function setupKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
         if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
 
-        const imgViewer = document.getElementById('imageViewer');
-        const isImageMode = imgViewer && !imgViewer.classList.contains('hidden');
+        const isImageMode = !document.getElementById('imageViewer').classList.contains('hidden');
 
         switch (e.code) {
             case 'Space':
@@ -1180,7 +1083,7 @@ function setupKeyboardShortcuts() {
                 break;
             case 'KeyM':
                 e.preventDefault();
-                if(!isImageMode && muteBtn) muteBtn.click();
+                if(!isImageMode) muteBtn.click();
                 break;
             case 'ArrowLeft':
                 e.preventDefault();
@@ -1203,7 +1106,6 @@ function setupKeyboardShortcuts() {
 }
 
 function changeVolume(delta) {
-    if (!volumeBar || !player) return;
     let current = parseInt(volumeBar.value);
     let next = Math.min(Math.max(current + delta, 0), 100);
     volumeBar.value = next;
@@ -1216,24 +1118,21 @@ function changeVolume(delta) {
 function showToast(msg, category = 'system') {
     if (category && notificationSettings[category] === false) return;
     const t = document.getElementById("toast");
-    const msgEl = document.getElementById("toastMsg");
-    if (!t || !msgEl) return;
-    msgEl.textContent = msg;
+    document.getElementById("toastMsg").textContent = msg;
     t.classList.remove("translate-y-10", "opacity-0", "pointer-events-none");
     t.classList.add("translate-y-10", "opacity-100");
     setTimeout(() => { t.classList.remove("translate-y-0", "opacity-100"); t.classList.add("translate-y-10", "opacity-0", "pointer-events-none"); }, 3500);
 }
 
-function updateSeekBarUI(p) { if(seekBar) { seekBar.value = p; seekBar.style.setProperty('--seek-percent', `${p}%`); } }
-function updateVolumeBarUI(p) { if(volumeBar) { volumeBar.value = p; volumeBar.style.setProperty('--volume-percent', `${p}%`); if(volumeLevelText) volumeLevelText.textContent = `${p}%`; } }
+function updateSeekBarUI(p) { seekBar.value = p; seekBar.style.setProperty('--seek-percent', `${p}%`); }
+function updateVolumeBarUI(p) { volumeBar.value = p; volumeBar.style.setProperty('--volume-percent', `${p}%`); volumeLevelText.textContent = `${p}%`; }
 function formatTime(sec) { const m = Math.floor(sec/60).toString().padStart(2,'0'); const s = Math.floor(sec%60).toString().padStart(2,'0'); return `${m}:${s}`; }
 
 function toggleFullscreen() {
     const c = document.getElementById("videoContainer");
-    if (!c) return;
-    if (player && player.webkitEnterFullscreen && /iPhone|iPod/.test(navigator.userAgent)) { player.webkitEnterFullscreen(); return; }
+    if (player.webkitEnterFullscreen && /iPhone|iPod/.test(navigator.userAgent)) { player.webkitEnterFullscreen(); return; }
     if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-        if (c.requestFullscreen) c.requestFullscreen(); else if (c.webkitRequestFullscreen) c.webkitRequestFullscreen();
+        if (c.requestFullscreen() ) c.requestFullscreen(); else if (c.webkitRequestFullscreen) c.webkitRequestFullscreen();
     } else {
         if (document.exitFullscreen) document.exitFullscreen(); else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
     }
@@ -1254,27 +1153,23 @@ async function togglePiP() {
 document.addEventListener('fullscreenchange', onFullscreenChange); document.addEventListener('webkitfullscreenchange', onFullscreenChange);
 function onFullscreenChange() {
     const isFull = document.fullscreenElement || document.webkitFullscreenElement;
-    if (fullscreenBtn) fullscreenBtn.innerHTML = isFull ? `<i data-lucide="minimize" class="w-5 h-5"></i>` : `<i data-lucide="maximize" class="w-5 h-5"></i>`;
-    const container = document.getElementById("videoContainer");
-    if (container) {
-        isFull ? container.classList.remove("rounded-theme") : container.classList.add("rounded-theme");
-    }
-    if (window.lucide) lucide.createIcons();
+    fullscreenBtn.innerHTML = isFull ? `<i data-lucide="minimize" class="w-5 h-5"></i>` : `<i data-lucide="maximize" class="w-5 h-5"></i>`;
+    isFull ? document.getElementById("videoContainer").classList.remove("rounded-theme") : document.getElementById("videoContainer").classList.add("rounded-theme");
+    lucide.createIcons();
 }
 
 let resumeSaveTimer = null;
 
 function setupPlayerEventListeners() {
-    if (!player) return;
     let dragging = false;
-    if (playBtn) playBtn.onclick = togglePlay;
-    player.oncanplay = () => { if (videoSpinner) videoSpinner.classList.add("hidden"); };
-    player.onwaiting = () => { if (videoSpinner) videoSpinner.classList.remove("hidden"); };
+    playBtn.onclick = togglePlay;
+    player.oncanplay = () => videoSpinner.classList.add("hidden");
+    player.onwaiting = () => videoSpinner.classList.remove("hidden");
     
     player.ontimeupdate = () => { 
         if(!dragging && !isNaN(player.duration)) { 
             updateSeekBarUI((player.currentTime/player.duration)*100); 
-            if (currentTimeText) currentTimeText.textContent = formatTime(player.currentTime); 
+            currentTimeText.textContent = formatTime(player.currentTime); 
             
             if (currentUser && player.currentTime > 5 && player.currentTime < player.duration - 5) {
                 userResumeTimes[activeId] = Math.floor(player.currentTime);
@@ -1287,47 +1182,39 @@ function setupPlayerEventListeners() {
             }
         } 
     };
-    player.onloadedmetadata = () => { if (durationText) durationText.textContent = formatTime(player.duration); };
+    player.onloadedmetadata = () => { durationText.textContent = formatTime(player.duration); };
     
     player.onended = () => {
         delete userResumeTimes[activeId];
         saveUserDataToCloud();
-        if (playBtn) playBtn.innerHTML = `<i data-lucide="play" class="w-6 h-6 fill-current"></i>`;
-        if (window.lucide) lucide.createIcons();
+        playBtn.innerHTML = `<i data-lucide="play" class="w-6 h-6 fill-current"></i>`;
+        lucide.createIcons();
         resetControlsTimeout();
     };
 
-    if (seekBar) {
-        seekBar.onmousedown = seekBar.ontouchstart = () => dragging = true;
-        seekBar.oninput = () => { seekBar.style.setProperty('--seek-percent', `${seekBar.value}%`); if(!isNaN(player.duration)) { player.currentTime = (seekBar.value/100)*player.duration; if (currentTimeText) currentTimeText.textContent = formatTime(player.currentTime); } };
-        seekBar.onchange = window.onmouseup = window.ontouchend = () => { if(dragging) { dragging=false; if(!isNaN(player.duration)) player.currentTime = (seekBar.value/100)*player.duration; } };
-    }
-    if (volumeBar) {
-        volumeBar.oninput = () => { player.volume = volumeBar.value/100; player.muted = player.volume===0; updateVolumeBarUI(volumeBar.value); updateVolumeIcon(); };
-    }
-    if (muteBtn) {
-        muteBtn.onclick = () => { player.muted = !player.muted; updateVolumeBarUI(player.muted ? 0 : Math.round(player.volume*100)); updateVolumeIcon(); };
-    }
-    if (fullscreenBtn) fullscreenBtn.onclick = toggleFullscreen;
+    seekBar.onmousedown = seekBar.ontouchstart = () => dragging = true;
+    seekBar.oninput = () => { seekBar.style.setProperty('--seek-percent', `${seekBar.value}%`); if(!isNaN(player.duration)) { player.currentTime = (seekBar.value/100)*player.duration; currentTimeText.textContent = formatTime(player.currentTime); } };
+    seekBar.onchange = window.onmouseup = window.ontouchend = () => { if(dragging) { dragging=false; if(!isNaN(player.duration)) player.currentTime = (seekBar.value/100)*player.duration; } };
+    volumeBar.oninput = () => { player.volume = volumeBar.value/100; player.muted = player.volume===0; updateVolumeBarUI(volumeBar.value); updateVolumeIcon(); };
+    muteBtn.onclick = () => { player.muted = !player.muted; updateVolumeBarUI(player.muted ? 0 : Math.round(player.volume*100)); updateVolumeIcon(); };
+    fullscreenBtn.onclick = toggleFullscreen;
 }
 
 function togglePlay() {
-    if (!player) return;
     if (player.paused) { 
         player.play(); 
-        if (playBtn) playBtn.innerHTML = `<i data-lucide="pause" class="w-6 h-6 fill-current"></i>`; 
+        playBtn.innerHTML = `<i data-lucide="pause" class="w-6 h-6 fill-current"></i>`; 
     } else { 
         player.pause(); 
-        if (playBtn) playBtn.innerHTML = `<i data-lucide="play" class="w-6 h-6 fill-current"></i>`; 
+        playBtn.innerHTML = `<i data-lucide="play" class="w-6 h-6 fill-current"></i>`; 
     }
     resetControlsTimeout();
-    if (window.lucide) lucide.createIcons();
+    lucide.createIcons();
 }
 
 function updateVolumeIcon() {
-    if (!muteBtn || !player) return;
     if (player.muted || player.volume===0) muteBtn.innerHTML = `<i data-lucide="volume-x" class="w-5 h-5 text-red-500"></i>`;
     else if (player.volume<0.5) muteBtn.innerHTML = `<i data-lucide="volume-1" class="w-5 h-5"></i>`;
     else muteBtn.innerHTML = `<i data-lucide="volume-2" class="w-5 h-5"></i>`;
-    if (window.lucide) lucide.createIcons();
+    lucide.createIcons();
 }
