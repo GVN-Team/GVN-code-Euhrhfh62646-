@@ -123,6 +123,153 @@ const dummyLocalDB = [
     { username: "UserName The ggrks", password: "Password The Annan" }
 ];
 
+/* ================= Discordログイン (OAuth2 Implicit Grant) =================
+ * 設定は child_script.js の window.SITE_CONFIG.discordAuth で行います。
+ * client_id / redirect_uri のみで完結する「Implicit Grant」方式のため、
+ * クライアントシークレットを一切使わず、フロントエンドだけで実装できます。
+ * 認証後、Discord API に問い合わせて「指定サーバーに参加していて、
+ * 指定ロールを保持しているか」を確認し、条件を満たした場合のみログインを許可します。
+ * ================================================================= */
+
+function getDiscordAuthConfig() {
+    const cfg = (window.SITE_CONFIG && window.SITE_CONFIG.discordAuth) || null;
+    if (!cfg || !cfg.enabled) return null;
+    if (!cfg.clientId || !cfg.guildId || !cfg.roleId) return null;
+    return cfg;
+}
+
+function getDiscordRedirectUri(cfg) {
+    if (cfg.redirectUri) return cfg.redirectUri;
+    return window.location.origin + window.location.pathname;
+}
+
+function loginWithDiscord() {
+    const cfg = getDiscordAuthConfig();
+    if (!cfg) {
+        showToast("Discordログインが設定されていません", "system");
+        return;
+    }
+    const redirectUri = getDiscordRedirectUri(cfg);
+    const params = new URLSearchParams({
+        client_id: cfg.clientId,
+        redirect_uri: redirectUri,
+        response_type: "token",
+        scope: "identify guilds.members.read"
+    });
+    window.location.href = "https://discord.com/oauth2/authorize?" + params.toString();
+}
+
+function clearDiscordAuthHash() {
+    if (window.location.hash) {
+        history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+}
+
+async function verifyDiscordMembership(accessToken, cfg) {
+    const memberRes = await fetch(`https://discord.com/api/users/@me/guilds/${cfg.guildId}/member`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    if (!memberRes.ok) {
+        // 対象サーバーに参加していない、またはトークンが無効
+        return null;
+    }
+    const member = await memberRes.json();
+    const roles = Array.isArray(member.roles) ? member.roles : [];
+    if (!roles.includes(cfg.roleId)) {
+        return null; // ロール未保持
+    }
+
+    const userRes = await fetch("https://discord.com/api/users/@me", {
+        headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    if (!userRes.ok) return null;
+    const user = await userRes.json();
+
+    const displayName = member.nick || user.global_name || user.username;
+    return {
+        id: user.id,
+        username: displayName,
+        avatar: user.avatar
+            ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`
+            : null
+    };
+}
+
+async function handleDiscordRedirect() {
+    const cfg = getDiscordAuthConfig();
+    if (!cfg) return false;
+
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const accessToken = hashParams.get("access_token");
+    const expiresIn = hashParams.get("expires_in");
+
+    if (window.location.hash.includes("error=")) {
+        clearDiscordAuthHash();
+        showToast("Discord認証がキャンセルされました", "system");
+        return false;
+    }
+
+    if (!accessToken) return false;
+
+    clearDiscordAuthHash();
+
+    const errBox = document.getElementById('loginError');
+    const btnArea = document.getElementById('loginBtnContainer');
+    const loadArea = document.getElementById('loadingArea');
+    const loadMsg = document.getElementById('loadingMsg');
+    if (loadArea) { loadArea.classList.remove('hidden'); loadArea.classList.add('flex'); }
+    if (loadMsg) loadMsg.textContent = "Discordでロールを確認しています";
+    if (btnArea) btnArea.classList.add('hidden');
+
+    try {
+        const identity = await verifyDiscordMembership(accessToken, cfg);
+        if (!identity) {
+            if (loadArea) { loadArea.classList.add('hidden'); loadArea.classList.remove('flex'); }
+            if (btnArea) btnArea.classList.remove('hidden');
+            if (errBox) {
+                errBox.querySelector('span').textContent = "対象サーバーの必須ロールが確認できませんでした";
+                errBox.classList.remove('hidden'); errBox.classList.add('flex');
+            }
+            return false;
+        }
+
+        const expiresAt = expiresIn ? Date.now() + parseInt(expiresIn, 10) * 1000 : null;
+        setStoredData('discord_session', { token: accessToken, expiresAt, identity });
+        setStoredData('session_user', identity.username);
+        applyLoginState(identity.username);
+        return true;
+    } catch (e) {
+        if (loadArea) { loadArea.classList.add('hidden'); loadArea.classList.remove('flex'); }
+        if (btnArea) btnArea.classList.remove('hidden');
+        if (errBox) {
+            errBox.querySelector('span').textContent = "Discord認証中にエラーが発生しました";
+            errBox.classList.remove('hidden'); errBox.classList.add('flex');
+        }
+        return false;
+    }
+}
+
+async function restoreDiscordSession() {
+    const cfg = getDiscordAuthConfig();
+    if (!cfg) return false;
+
+    const session = getStoredData('discord_session', null);
+    if (!session || !session.token) return false;
+    if (session.expiresAt && Date.now() > session.expiresAt) {
+        localStorage.removeItem(STORAGE_PREFIX + 'discord_session');
+        return false;
+    }
+
+    // リロードのたびにロール保持を再確認し、剥奪されていたらログアウトさせる
+    const identity = await verifyDiscordMembership(session.token, cfg);
+    if (!identity) {
+        localStorage.removeItem(STORAGE_PREFIX + 'discord_session');
+        return false;
+    }
+    applyLoginState(identity.username);
+    return true;
+}
+
 const externalLinks = [
     { no: 1, title: "Likes", url: "https://gvn-team.github.io/Likes-Vm1wR2IxWXlUblJTYkdoUFYwWndZVlJYTVc5aU1XeDBXWHBzVVZWVU1Eaz0-/", icon: "", color: "white", borderColor: "red" }
 ];
@@ -132,12 +279,20 @@ let userWatchHistory = [];
 let userWatchLater = [];
 let userResumeTimes = {};
 
-window.onload = function() {
+window.onload = async function() {
     lucide.createIcons();
-    const savedUser = getStoredData('session_user', null);
-    if (savedUser) {
-        applyLoginState(savedUser);
+
+    const cameFromDiscord = await handleDiscordRedirect();
+    if (!cameFromDiscord) {
+        const restoredDiscord = await restoreDiscordSession();
+        if (!restoredDiscord) {
+            const savedUser = getStoredData('session_user', null);
+            if (savedUser) {
+                applyLoginState(savedUser);
+            }
+        }
     }
+
     setupKeyboardShortcuts();
     setupDoubleTapGestures();
     setupAutoFadeControls();
@@ -296,6 +451,7 @@ function closeUserMenu() {
 function logout() {
     try {
         localStorage.removeItem(STORAGE_PREFIX + 'session_user');
+        localStorage.removeItem(STORAGE_PREFIX + 'discord_session');
     } catch (e) {}
 
     currentUser = null;
