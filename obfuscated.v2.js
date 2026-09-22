@@ -1,13 +1,3 @@
-/* =========================================================
-   The._.Sigh - メインロジック (main.js)
-   ※ このファイルより先に config.js を読み込んでください。
-   ========================================================= */
-
-/* ---------------------------------------------------------
-   Firebase クラウド同期(モジュール読み込みを動的importに変換)
-   ※元のファイルと同じく window.doc / setDoc / getDoc は公開して
-     いません(元コードのままの挙動を維持しています)。
---------------------------------------------------------- */
 (async function initFirebaseSync() {
     const appId = typeof __app_id !== 'undefined' ? __app_id : window.APP_UNIQUE_ID;
     let db = null;
@@ -50,9 +40,6 @@
     window.appId = appId;
 })();
 
-/* ---------------------------------------------------------
-   アプリ本体のロジック
---------------------------------------------------------- */
         const STORAGE_PREFIX = window.APP_UNIQUE_ID + "_";
 
         function getStoredData(key, defaultVal) {
@@ -213,7 +200,6 @@
             loadArea.classList.remove('hidden');
             loadArea.classList.add('flex');
             
-            // Discordログイン時：文字を表示せずグルグル（スピナー）のみにする
             if (loadTextContainer) {
                 loadTextContainer.classList.add('hidden');
             }
@@ -228,7 +214,6 @@
                     return;
                 }
 
-                // ユーザー情報とGuild Member情報を取得
                 const userRes = await fetch('https://discord.com/api/v10/users/@me', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
@@ -239,7 +224,6 @@
 
                 const userData = await userRes.json();
                 
-                // DiscordアイコンのURL生成
                 let avatarUrl = "";
                 if (userData.avatar) {
                     avatarUrl = `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`;
@@ -319,7 +303,6 @@
             document.getElementById('loginError').classList.add('hidden');
             btnArea.classList.add('hidden');
             
-            // 通常ログイン時：文字テキストを表示してステップ実行
             if (loadTextContainer) {
                 loadTextContainer.classList.remove('hidden');
             }
@@ -375,7 +358,6 @@
 
             document.getElementById('headerUsername').textContent = username;
             
-            // 右上アイコンをDiscord認証のアイコンに設定（存在しない場合は標準アイコン）
             const userMenuBtn = document.getElementById('userMenuBtn');
             if (currentUserAvatar) {
                 userMenuBtn.innerHTML = `<img src="${currentUserAvatar}" alt="${username}" class="w-full h-full object-cover rounded-full">`;
@@ -694,7 +676,6 @@
             lucide.createIcons();
         }
 
-        // config.js で定義されたデータを使用
         const videos = videosData;
 
         let activeId = 1;
