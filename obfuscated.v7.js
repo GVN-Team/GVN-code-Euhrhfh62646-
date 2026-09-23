@@ -65,13 +65,27 @@
             system: true
         });
 
-        const appConfig = {
+        const DEFAULT_APP_CONFIG = {
             playbackRate: 1.0,
-            autoPlay: true
+            autoPlay: true,
+            defaultVolume: 100,
+            rememberMute: false,
+            loop: false,
+            autoNext: true,
+            doubleTapSeek: 10,
+            arrowKeySeek: 5,
+            controlsHideDelay: 3,
+            theaterModeDefault: false,
+            reduceMotion: false,
+            defaultSortOrder: "newest",
+            accentColor: "#ea580c",
+            uiScale: 100,
+            recordHistory: true
         };
+        const appConfig = Object.assign({}, DEFAULT_APP_CONFIG, getStoredData('app_config', {}));
 
         let searchQuery = "";
-        let currentSortOrder = "newest";
+        let currentSortOrder = appConfig.defaultSortOrder;
         let isTheaterMode = false;
         let pendingResumeTime = 0;
         let controlsTimeout = null;
@@ -149,10 +163,161 @@
 
         function updateAppConfig(key, value) {
             appConfig[key] = value;
-            if (key === 'playbackRate' && player) {
-                player.playbackRate = value;
-                showToast(`再生速度を ${value}x に変更しました`, 'playbackRate');
+            setStoredData('app_config', appConfig);
+
+            switch (key) {
+                case 'playbackRate':
+                    if (player) player.playbackRate = value;
+                    showToast(`再生速度を ${value}x に変更しました`, 'playbackRate');
+                    break;
+                case 'defaultVolume':
+                    if (player) { player.volume = value / 100; }
+                    break;
+                case 'loop':
+                    if (player) player.loop = value;
+                    break;
+                case 'defaultSortOrder':
+                    currentSortOrder = value;
+                    renderPlaylist();
+                    break;
+                case 'theaterModeDefault':
+                    if (value !== isTheaterMode) toggleTheaterMode(true);
+                    break;
+                case 'reduceMotion':
+                    applyReduceMotion(value);
+                    break;
+                case 'accentColor':
+                    applyAccentColor(value);
+                    break;
+                case 'uiScale':
+                    applyUiScale(value);
+                    break;
             }
+        }
+
+        function darkenHexColor(hex, percent) {
+            hex = (hex || '#ea580c').replace('#', '');
+            if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+            const num = parseInt(hex, 16);
+            let r = Math.max(0, (num >> 16) - Math.round(255 * percent / 100));
+            let g = Math.max(0, ((num >> 8) & 0x00FF) - Math.round(255 * percent / 100));
+            let b = Math.max(0, (num & 0x0000FF) - Math.round(255 * percent / 100));
+            return '#' + (0x1000000 + r * 0x10000 + g * 0x100 + b).toString(16).slice(1);
+        }
+
+        function applyAccentColor(hex) {
+            const root = document.documentElement;
+            root.style.setProperty('--accent', hex);
+            root.style.setProperty('--accent-hover', darkenHexColor(hex, 15));
+            root.style.setProperty('--shadow-color', hex);
+        }
+
+        function applyUiScale(pct) {
+            document.documentElement.style.fontSize = pct + '%';
+        }
+
+        function applyReduceMotion(enabled) {
+            document.documentElement.classList.toggle('reduce-motion', !!enabled);
+        }
+
+        function applyStartupConfig() {
+            applyAccentColor(appConfig.accentColor);
+            applyUiScale(appConfig.uiScale);
+            applyReduceMotion(appConfig.reduceMotion);
+            if (appConfig.theaterModeDefault) toggleTheaterMode(true);
+        }
+
+        function getNextVideoId() {
+            let filtered = videos.filter(v => {
+                if (!searchQuery) return true;
+                const titleMatch = v.title.toLowerCase().includes(searchQuery);
+                const descMatch = v.desc.toLowerCase().includes(searchQuery);
+                const dateMatch = v.date.includes(searchQuery);
+                return titleMatch || descMatch || dateMatch;
+            });
+            if (currentSortOrder === "oldest") {
+                filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
+            } else {
+                filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+            }
+            const idx = filtered.findIndex(v => v.id === activeId);
+            if (idx === -1 || idx === filtered.length - 1) return null;
+            return filtered[idx + 1].id;
+        }
+
+        function exportUserData() {
+            const data = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith(STORAGE_PREFIX)) {
+                    data[key.slice(STORAGE_PREFIX.length)] = localStorage.getItem(key);
+                }
+            }
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${window.APP_UNIQUE_ID}_backup_${new Date().toISOString().slice(0,10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            showToast("データをエクスポートしました", "system");
+        }
+
+        function importUserData(fileInput) {
+            const file = fileInput.files && fileInput.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    Object.keys(data).forEach(key => {
+                        localStorage.setItem(STORAGE_PREFIX + key, data[key]);
+                    });
+                    showToast("データを読み込みました。再読み込みします", "system");
+                    setTimeout(() => location.reload(), 1000);
+                } catch (err) {
+                    showToast("ファイルの読み込みに失敗しました", "system");
+                }
+            };
+            reader.readAsText(file);
+            fileInput.value = '';
+        }
+
+        function resetAllSettingsAndData() {
+            if (!confirm("設定と保存データ(履歴・あとで見る・視聴位置・設定)をすべて初期化します。よろしいですか？")) return;
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith(STORAGE_PREFIX)) keysToRemove.push(key);
+            }
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+            showToast("初期化しました。再読み込みします", "system");
+            setTimeout(() => location.reload(), 1000);
+        }
+
+        function populateSettingsInputs() {
+            const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+            const setChecked = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
+
+            setVal('config-playbackRate', appConfig.playbackRate);
+            setChecked('config-autoPlay', appConfig.autoPlay);
+            setVal('config-defaultVolume', appConfig.defaultVolume);
+            const volLabel = document.getElementById('volumeValueLabel');
+            if (volLabel) volLabel.textContent = appConfig.defaultVolume;
+            setChecked('config-rememberMute', appConfig.rememberMute);
+            setChecked('config-loop', appConfig.loop);
+            setChecked('config-autoNext', appConfig.autoNext);
+            setVal('config-doubleTapSeek', appConfig.doubleTapSeek);
+            setVal('config-arrowKeySeek', appConfig.arrowKeySeek);
+            setVal('config-controlsHideDelay', appConfig.controlsHideDelay);
+            setChecked('config-theaterModeDefault', appConfig.theaterModeDefault);
+            setChecked('config-reduceMotion', appConfig.reduceMotion);
+            setVal('config-defaultSortOrder', appConfig.defaultSortOrder);
+            setVal('config-accentColor', appConfig.accentColor);
+            setVal('config-uiScale', appConfig.uiScale);
+            setChecked('config-recordHistory', appConfig.recordHistory);
         }
 
         let currentUser = null;
@@ -259,6 +424,7 @@
 
         window.onload = function() {
             lucide.createIcons();
+            applyStartupConfig();
             
             handleDiscordCallback();
 
@@ -625,6 +791,7 @@
         function openSettings() {
             const modal = document.getElementById('settingsModal');
             const content = document.getElementById('settingsModalContent');
+            populateSettingsInputs();
             modal.classList.remove('hidden');
             setTimeout(() => {
                 modal.classList.remove('opacity-0');
@@ -743,7 +910,7 @@
             vDesc.innerHTML = formatHashtags(v.desc);
             renderPlaylist();
             updateWatchLaterBtnUI();
-            recordHistory(v.id);
+            if (appConfig.recordHistory) recordHistory(v.id);
 
             const imageViewer = document.getElementById('imageViewer');
             const controls = document.getElementById('playerControls');
@@ -772,6 +939,11 @@
                 player.load();
                 
                 player.playbackRate = appConfig.playbackRate;
+                player.loop = appConfig.loop;
+                player.volume = appConfig.defaultVolume / 100;
+                if (appConfig.rememberMute) {
+                    player.muted = getStoredData('muted_state', false);
+                }
                 videoSpinner.classList.remove("hidden");
                 updateSeekBarUI(0);
 
@@ -922,7 +1094,7 @@
             resetControlsTimeout();
         }
 
-        function toggleTheaterMode() {
+        function toggleTheaterMode(silent) {
             isTheaterMode = !isTheaterMode;
             const grid = document.getElementById("mainLayoutGrid");
             const playerCol = document.getElementById("playerColumn");
@@ -935,7 +1107,7 @@
                 playerCol.classList.add("lg:col-span-3");
                 
                 theaterBtn.innerHTML = `<i data-lucide="rectangle-vertical" class="w-5 h-5 text-brandAccent"></i>`;
-                showToast("大画面モード: ON", 'system');
+                if (!silent) showToast("大画面モード: ON", 'system');
             } else {
                 grid.classList.remove("max-w-7xl");
                 grid.classList.add("max-w-6xl");
@@ -943,7 +1115,7 @@
                 playerCol.classList.add("lg:col-span-2");
                 
                 theaterBtn.innerHTML = `<i data-lucide="rectangle-horizontal" class="w-5 h-5"></i>`;
-                showToast("大画面モード: OFF", 'system');
+                if (!silent) showToast("大画面モード: OFF", 'system');
             }
             lucide.createIcons();
         }
@@ -1150,11 +1322,22 @@
             playBtn.onclick = togglePlay;
             muteBtn.onclick = () => {
                 player.muted = !player.muted;
+                if (appConfig.rememberMute) setStoredData('muted_state', player.muted);
                 muteBtn.innerHTML = player.muted 
                     ? `<i data-lucide="volume-x" class="w-5 h-5 text-red-400"></i>` 
                     : `<i data-lucide="volume-2" class="w-5 h-5"></i>`;
                 lucide.createIcons();
             };
+
+            player.addEventListener("ended", () => {
+                if (appConfig.autoNext) {
+                    const nextId = getNextVideoId();
+                    if (nextId) {
+                        showToast("次の動画を再生します", "system");
+                        loadMedia(nextId);
+                    }
+                }
+            });
 
             fullscreenBtn.onclick = () => {
                 const container = document.getElementById("videoContainer");
@@ -1238,7 +1421,7 @@
                 leftZone.addEventListener("click", () => {
                     const now = Date.now();
                     if (now - lastTapLeft < 300) {
-                        skipTime(-10);
+                        skipTime(-appConfig.doubleTapSeek);
                         showRipple(leftRipple);
                     }
                     lastTapLeft = now;
@@ -1249,7 +1432,7 @@
                 rightZone.addEventListener("click", () => {
                     const now = Date.now();
                     if (now - lastTapRight < 300) {
-                        skipTime(10);
+                        skipTime(appConfig.doubleTapSeek);
                         showRipple(rightRipple);
                     }
                     lastTapRight = now;
@@ -1310,7 +1493,7 @@
                     if (v && (v.type === 'image' || v.images)) {
                         prevImage();
                     } else {
-                        skipTime(-5);
+                        skipTime(-appConfig.arrowKeySeek);
                     }
                 } else if (e.code === 'ArrowRight') {
                     e.preventDefault();
@@ -1318,7 +1501,7 @@
                     if (v && (v.type === 'image' || v.images)) {
                         nextImage();
                     } else {
-                        skipTime(5);
+                        skipTime(appConfig.arrowKeySeek);
                     }
                 } else if (e.code === 'ArrowUp') {
                     e.preventDefault();
@@ -1356,11 +1539,11 @@
             controls.style.opacity = "1";
             controls.style.pointerEvents = "auto";
             clearTimeout(controlsTimeout);
-            if (!player.paused) {
+            if (!player.paused && appConfig.controlsHideDelay > 0) {
                 controlsTimeout = setTimeout(() => {
                     controls.style.opacity = "0";
                     controls.style.pointerEvents = "none";
-                }, 3000);
+                }, appConfig.controlsHideDelay * 1000);
             }
         }
 
