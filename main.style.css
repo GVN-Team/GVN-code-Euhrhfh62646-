@@ -25,6 +25,13 @@
             -webkit-tap-highlight-color: transparent;
             user-select: none;
         }
+
+        .reduce-motion, .reduce-motion * {
+            transition-duration: 0.001ms !important;
+            animation-duration: 0.001ms !important;
+            animation-iteration-count: 1 !important;
+            scroll-behavior: auto !important;
+        }
         
         .theme-shadow { box-shadow: 0 10px 40px -10px var(--shadow-color); opacity: 0.8; }
         
