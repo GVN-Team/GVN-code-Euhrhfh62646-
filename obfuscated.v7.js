@@ -192,6 +192,9 @@
                 case 'uiScale':
                     applyUiScale(value);
                     break;
+                case 'doubleTapSeek':
+                    updateSkipLabels();
+                    break;
             }
         }
 
@@ -220,10 +223,23 @@
             document.documentElement.classList.toggle('reduce-motion', !!enabled);
         }
 
+        function updateSkipLabels() {
+            const sec = appConfig.doubleTapSeek;
+            const leftText = document.getElementById('leftRippleText');
+            const rightText = document.getElementById('rightRippleText');
+            if (leftText) leftText.textContent = `${sec}秒戻る`;
+            if (rightText) rightText.textContent = `${sec}秒進む`;
+            const skipBackBtn = document.getElementById('skipBackBtn');
+            const skipForwardBtn = document.getElementById('skipForwardBtn');
+            if (skipBackBtn) skipBackBtn.title = `${sec}秒戻る`;
+            if (skipForwardBtn) skipForwardBtn.title = `${sec}秒進む`;
+        }
+
         function applyStartupConfig() {
             applyAccentColor(appConfig.accentColor);
             applyUiScale(appConfig.uiScale);
             applyReduceMotion(appConfig.reduceMotion);
+            updateSkipLabels();
             if (appConfig.theaterModeDefault) toggleTheaterMode(true);
         }
 
