@@ -836,20 +836,20 @@
 
         function openSettings() {
             const modal = document.getElementById('settingsModal');
-            const content = document.getElementById('settingsModalContent');
+            const wrapper = document.getElementById('settingsModalScaleWrapper');
             populateSettingsInputs();
             lockBodyScroll();
             modal.classList.remove('hidden');
             setTimeout(() => {
                 modal.classList.remove('opacity-0');
-                content.classList.remove('scale-95'); content.classList.add('scale-100');
+                wrapper.classList.remove('scale-95'); wrapper.classList.add('scale-100');
             }, 10);
         }
         function closeSettings() {
             const modal = document.getElementById('settingsModal');
-            const content = document.getElementById('settingsModalContent');
+            const wrapper = document.getElementById('settingsModalScaleWrapper');
             modal.classList.add('opacity-0');
-            content.classList.remove('scale-100'); content.classList.add('scale-95');
+            wrapper.classList.remove('scale-100'); wrapper.classList.add('scale-95');
             setTimeout(() => modal.classList.add('hidden'), 300);
             unlockBodyScroll();
         }
