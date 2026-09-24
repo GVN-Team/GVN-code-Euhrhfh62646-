@@ -42,6 +42,28 @@
 
         const STORAGE_PREFIX = window.APP_UNIQUE_ID + "_";
 
+        let savedScrollY = 0;
+        function lockBodyScroll() {
+            if (document.body.dataset.scrollLocked === '1') return;
+            savedScrollY = window.scrollY || window.pageYOffset || 0;
+            document.body.style.position = 'fixed';
+            document.body.style.top = `-${savedScrollY}px`;
+            document.body.style.left = '0';
+            document.body.style.right = '0';
+            document.body.style.width = '100%';
+            document.body.dataset.scrollLocked = '1';
+        }
+        function unlockBodyScroll() {
+            if (document.body.dataset.scrollLocked !== '1') return;
+            document.body.style.position = '';
+            document.body.style.top = '';
+            document.body.style.left = '';
+            document.body.style.right = '';
+            document.body.style.width = '';
+            document.body.dataset.scrollLocked = '';
+            window.scrollTo(0, savedScrollY);
+        }
+
         function getStoredData(key, defaultVal) {
             try {
                 const item = localStorage.getItem(STORAGE_PREFIX + key);
@@ -154,11 +176,13 @@
                 if (checkbox) checkbox.checked = !!notificationSettings[cat];
             });
             clearNotifSearch();
+            lockBodyScroll();
             document.getElementById('notificationSettingsModal').classList.remove('hidden');
         }
 
         function closeNotificationSettingsModal() {
             document.getElementById('notificationSettingsModal').classList.add('hidden');
+            unlockBodyScroll();
         }
 
         function updateAppConfig(key, value) {
@@ -710,11 +734,13 @@
                 });
             }
             document.getElementById('historyModal').classList.remove('hidden');
+            lockBodyScroll();
             lucide.createIcons();
         }
 
         function closeHistoryModal() {
             document.getElementById('historyModal').classList.add('hidden');
+            unlockBodyScroll();
         }
 
         function clearHistory() {
@@ -777,6 +803,7 @@
                 });
             }
             document.getElementById('watchLaterModal').classList.remove('hidden');
+            lockBodyScroll();
             lucide.createIcons();
         }
 
@@ -795,19 +822,23 @@
 
         function closeWatchLaterModal() {
             document.getElementById('watchLaterModal').classList.add('hidden');
+            unlockBodyScroll();
         }
 
         function showShortcutsModal() {
             document.getElementById('shortcutsModal').classList.remove('hidden');
+            lockBodyScroll();
         }
         function closeShortcutsModal() {
             document.getElementById('shortcutsModal').classList.add('hidden');
+            unlockBodyScroll();
         }
 
         function openSettings() {
             const modal = document.getElementById('settingsModal');
             const content = document.getElementById('settingsModalContent');
             populateSettingsInputs();
+            lockBodyScroll();
             modal.classList.remove('hidden');
             setTimeout(() => {
                 modal.classList.remove('opacity-0');
@@ -820,6 +851,7 @@
             modal.classList.add('opacity-0');
             content.classList.remove('scale-100'); content.classList.add('scale-95');
             setTimeout(() => modal.classList.add('hidden'), 300);
+            unlockBodyScroll();
         }
 
         function renderExternalLinks() {
@@ -968,6 +1000,7 @@
                     pendingResumeTime = savedTime;
                     document.getElementById('resumeTimeText').textContent = `再生位置: ${formatTime(savedTime)}`;
                     document.getElementById('resumeModal').classList.remove('hidden');
+                    lockBodyScroll();
                 } else {
                     startVideoPlayback();
                 }
