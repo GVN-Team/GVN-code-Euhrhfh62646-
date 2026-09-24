@@ -325,6 +325,113 @@
             fileInput.value = '';
         }
 
+        function buildMyPageHTML() {
+            const uniqueWatchedIds = [...new Set(userWatchHistory.map(h => h.id))];
+            const watchedCount = uniqueWatchedIds.length;
+            const watchLaterCount = userWatchLater.length;
+            const totalCount = videos.length;
+            const recent = userWatchHistory.slice(0, 6)
+                .map(h => videos.find(v => v.id === h.id))
+                .filter(Boolean);
+
+            const recentHtml = recent.length > 0 ? recent.map(v => `
+                <div onclick="closeMyPage(); loadMedia(${v.id});" class="cursor-pointer group">
+                    <div class="aspect-video rounded-lg overflow-hidden border border-brandBorder relative bg-brandBg">
+                        <img src="${v.thumbnail}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" alt="">
+                        <span class="absolute bottom-1 right-1 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded font-bold">${v.duration || ''}</span>
+                    </div>
+                    <p class="text-[11px] text-brandText font-bold mt-1 truncate">${v.title || '(無題)'}</p>
+                </div>
+            `).join('') : `<p class="text-xs text-brandMuted col-span-3 text-center py-6">まだ視聴履歴がありません</p>`;
+
+            return `
+            <div id="myPageModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 opacity-0 transition-opacity duration-300">
+              <div id="myPageScaleWrapper" class="transform scale-95 transition-transform duration-300 w-full max-w-lg">
+                <div class="bg-brandSurface border border-brandBorder rounded-theme w-full max-h-[90vh] overflow-y-auto scrollbar-thin p-6 shadow-2xl relative" id="myPageContent">
+                    <button onclick="closeMyPage()" class="absolute top-4 right-4 text-brandMuted hover:text-brandAccent transition active:scale-90 bg-brandBg p-2 rounded-full border border-brandBorder">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+
+                    <div class="flex items-center gap-4 mb-6 pb-5 border-b border-brandBorder">
+                        <div class="w-16 h-16 rounded-full bg-brandBg border-2 border-brandAccent overflow-hidden flex items-center justify-center flex-shrink-0 shadow-lg shadow-brandAccent/20">
+                            ${currentUserAvatar ? `<img src="${currentUserAvatar}" class="w-full h-full object-cover" alt="">` : `<i data-lucide="user" class="w-8 h-8 text-brandMuted"></i>`}
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-lg font-black text-brandText truncate">${currentUser || 'ゲスト'}</p>
+                            <p class="text-xs text-brandAccent font-bold flex items-center gap-1 mt-0.5"><i data-lucide="check-circle" class="w-3.5 h-3.5"></i> ログイン中</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-3 mb-6">
+                        <div class="bg-brandBg border border-brandBorder rounded-xl p-3 text-center">
+                            <p class="text-2xl font-black text-brandAccent">${watchedCount}</p>
+                            <p class="text-[10px] text-brandMuted font-bold mt-1">視聴済み</p>
+                        </div>
+                        <div class="bg-brandBg border border-brandBorder rounded-xl p-3 text-center">
+                            <p class="text-2xl font-black text-brandAccent">${watchLaterCount}</p>
+                            <p class="text-[10px] text-brandMuted font-bold mt-1">あとで見る</p>
+                        </div>
+                        <div class="bg-brandBg border border-brandBorder rounded-xl p-3 text-center">
+                            <p class="text-2xl font-black text-brandAccent">${totalCount}</p>
+                            <p class="text-[10px] text-brandMuted font-bold mt-1">全コンテンツ</p>
+                        </div>
+                    </div>
+
+                    <h3 class="text-xs font-bold text-brandMuted mb-3 flex items-center gap-1.5"><i data-lucide="clock" class="w-3.5 h-3.5"></i> 最近見た動画</h3>
+                    <div class="grid grid-cols-3 gap-2 mb-6">
+                        ${recentHtml}
+                    </div>
+
+                    <h3 class="text-xs font-bold text-brandMuted mb-3 flex items-center gap-1.5"><i data-lucide="zap" class="w-3.5 h-3.5"></i> クイックアクション</h3>
+                    <div class="grid grid-cols-2 gap-2 mb-2">
+                        <button onclick="closeMyPage(); openHistoryModal();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandBg border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-2.5 transition"><i data-lucide="history" class="w-4 h-4 text-brandMuted"></i> 視聴履歴</button>
+                        <button onclick="closeMyPage(); openWatchLaterModal();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandBg border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-2.5 transition"><i data-lucide="bookmark" class="w-4 h-4 text-brandMuted"></i> あとで見る</button>
+                        <button onclick="closeMyPage(); openSettings();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandBg border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-2.5 transition"><i data-lucide="settings" class="w-4 h-4 text-brandMuted"></i> 設定</button>
+                        <button onclick="closeMyPage(); openNotificationSettingsModal();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandBg border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-2.5 transition"><i data-lucide="bell" class="w-4 h-4 text-brandMuted"></i> 通知設定</button>
+                        <button onclick="closeMyPage(); showShortcutsModal();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandBg border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-2.5 transition"><i data-lucide="keyboard" class="w-4 h-4 text-brandMuted"></i> ショートカット</button>
+                        <button onclick="exportUserData();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandBg border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-2.5 transition"><i data-lucide="download" class="w-4 h-4 text-brandMuted"></i> データ保存</button>
+                    </div>
+
+                    <button onclick="closeMyPage(); logout();" class="w-full mt-4 flex items-center justify-center gap-2 text-xs font-bold text-red-500 bg-red-950/20 border border-red-900/50 hover:bg-red-950/40 rounded-lg px-3 py-3 transition">
+                        <i data-lucide="log-out" class="w-4 h-4"></i> ログアウト
+                    </button>
+                </div>
+              </div>
+            </div>`;
+        }
+
+        function openMyPage() {
+            if (!currentUser) {
+                showToast("マイページはログイン後にご利用いただけます", "system");
+                return;
+            }
+            const existing = document.getElementById('myPageModal');
+            if (existing) existing.remove();
+
+            document.body.insertAdjacentHTML('beforeend', buildMyPageHTML());
+            const modal = document.getElementById('myPageModal');
+            const wrapper = document.getElementById('myPageScaleWrapper');
+
+            lockBodyScroll();
+            lucide.createIcons();
+            modal.addEventListener('click', (e) => { if (e.target === modal) closeMyPage(); });
+
+            requestAnimationFrame(() => {
+                modal.classList.remove('opacity-0');
+                wrapper.classList.remove('scale-95'); wrapper.classList.add('scale-100');
+            });
+        }
+
+        function closeMyPage() {
+            const modal = document.getElementById('myPageModal');
+            const wrapper = document.getElementById('myPageScaleWrapper');
+            if (!modal) return;
+            modal.classList.add('opacity-0');
+            if (wrapper) { wrapper.classList.remove('scale-100'); wrapper.classList.add('scale-95'); }
+            unlockBodyScroll();
+            setTimeout(() => modal.remove(), 300);
+        }
+
         function resetAllSettingsAndData() {
             if (!confirm("設定と保存データ(履歴・あとで見る・視聴位置・設定)をすべて初期化します。よろしいですか？")) return;
             const keysToRemove = [];
