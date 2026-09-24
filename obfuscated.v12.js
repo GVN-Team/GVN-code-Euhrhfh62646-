@@ -78,12 +78,19 @@
             } catch (e) {}
         }
 
+        const NOTIFICATION_CATEGORIES = ['playbackRate', 'share', 'watchLater', 'historyClear', 'resume', 'theaterMode', 'autoNext', 'download', 'account', 'data', 'system'];
+
         const notificationSettings = getStoredData('notifications_config', {
             playbackRate: true,
             share: true,
             watchLater: true,
             historyClear: true,
             resume: true,
+            theaterMode: true,
+            autoNext: true,
+            download: true,
+            account: true,
+            data: true,
             system: true
         });
 
@@ -159,7 +166,7 @@
         }
 
         function setAllNotifications(enable) {
-            const categories = ['playbackRate', 'share', 'watchLater', 'historyClear', 'resume', 'system'];
+            const categories = NOTIFICATION_CATEGORIES;
             categories.forEach(cat => {
                 notificationSettings[cat] = enable;
                 const checkbox = document.getElementById(`notif-${cat}`);
@@ -170,7 +177,7 @@
         }
 
         function openNotificationSettingsModal() {
-            const categories = ['playbackRate', 'share', 'watchLater', 'historyClear', 'resume', 'system'];
+            const categories = NOTIFICATION_CATEGORIES;
             categories.forEach(cat => {
                 const checkbox = document.getElementById(`notif-${cat}`);
                 if (checkbox) checkbox.checked = !!notificationSettings[cat];
@@ -302,7 +309,7 @@
             a.click();
             a.remove();
             URL.revokeObjectURL(url);
-            showToast("データをエクスポートしました", "system");
+            showToast("データをエクスポートしました", "data");
         }
 
         function importUserData(fileInput) {
@@ -315,10 +322,10 @@
                     Object.keys(data).forEach(key => {
                         localStorage.setItem(STORAGE_PREFIX + key, data[key]);
                     });
-                    showToast("データを読み込みました。再読み込みします", "system");
+                    showToast("データを読み込みました。再読み込みします", "data");
                     setTimeout(() => location.reload(), 1000);
                 } catch (err) {
-                    showToast("ファイルの読み込みに失敗しました", "system");
+                    showToast("ファイルの読み込みに失敗しました", "data");
                 }
             };
             reader.readAsText(file);
@@ -402,7 +409,7 @@
 
         function openMyPage() {
             if (!currentUser) {
-                showToast("マイページはログイン後にご利用いただけます", "system");
+                showToast("マイページはログイン後にご利用いただけます", "account");
                 return;
             }
             const existing = document.getElementById('myPageModal');
@@ -440,7 +447,7 @@
                 if (key && key.startsWith(STORAGE_PREFIX)) keysToRemove.push(key);
             }
             keysToRemove.forEach(key => localStorage.removeItem(key));
-            showToast("初期化しました。再読み込みします", "system");
+            showToast("初期化しました。再読み込みします", "data");
             setTimeout(() => location.reload(), 1000);
         }
 
@@ -782,7 +789,7 @@
             document.getElementById('loginBtnContainer').classList.remove('hidden');
             document.getElementById('loginError').classList.add('hidden');
             
-            showToast("ログアウトしました", "system");
+            showToast("ログアウトしました", "account");
         }
 
         document.addEventListener('click', (e) => {
@@ -1263,7 +1270,7 @@
                 playerCol.classList.add("lg:col-span-3");
                 
                 theaterBtn.innerHTML = `<i data-lucide="rectangle-vertical" class="w-5 h-5 text-brandAccent"></i>`;
-                if (!silent) showToast("大画面モード: ON", 'system');
+                if (!silent) showToast("大画面モード: ON", 'theaterMode');
             } else {
                 grid.classList.remove("max-w-7xl");
                 grid.classList.add("max-w-6xl");
@@ -1271,7 +1278,7 @@
                 playerCol.classList.add("lg:col-span-2");
                 
                 theaterBtn.innerHTML = `<i data-lucide="rectangle-horizontal" class="w-5 h-5"></i>`;
-                if (!silent) showToast("大画面モード: OFF", 'system');
+                if (!silent) showToast("大画面モード: OFF", 'theaterMode');
             }
             lucide.createIcons();
         }
@@ -1312,7 +1319,7 @@
                     a.download = `image_${activeId}_${currentImageIndex + 1}.jpg`;
                     document.body.appendChild(a); a.click(); document.body.removeChild(a);
                     setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-                    showToast("画像を保存しました", 'system');
+                    showToast("画像を保存しました", 'download');
                 } catch(e) {
                     window.open(imgUrl, '_blank');
                 }
@@ -1337,7 +1344,7 @@
                     const a = document.createElement("a"); a.href = blobUrl; a.download = v.url.substring(v.url.lastIndexOf('/') + 1) || `video_${activeId}.mp4`;
                     document.body.appendChild(a); a.click(); document.body.removeChild(a);
                     setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-                    showToast("ダウンロード開始", 'system');
+                    showToast("ダウンロード開始", 'download');
                 } catch (e) {
                     openDownloadModal(v.url);
                 } finally {
@@ -1489,7 +1496,7 @@
                 if (appConfig.autoNext) {
                     const nextId = getNextVideoId();
                     if (nextId) {
-                        showToast("次の動画を再生します", "system");
+                        showToast("次の動画を再生します", "autoNext");
                         loadMedia(nextId);
                     }
                 }
