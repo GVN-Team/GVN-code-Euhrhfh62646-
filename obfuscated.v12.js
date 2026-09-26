@@ -349,61 +349,67 @@
                     </div>
                     <p class="text-[11px] text-brandText font-bold mt-1 truncate">${v.title || '(無題)'}</p>
                 </div>
-            `).join('') : `<p class="text-xs text-brandMuted col-span-3 text-center py-6">まだ視聴履歴がありません</p>`;
+            `).join('') : `<p class="text-xs text-brandMuted col-span-3 sm:col-span-4 text-center py-10">まだ視聴履歴がありません</p>`;
 
             return `
-            <div id="myPageModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 opacity-0 transition-opacity duration-300">
-              <div id="myPageScaleWrapper" class="transform scale-95 transition-transform duration-300 w-full max-w-lg">
-                <div class="bg-brandSurface border border-brandBorder rounded-theme w-full max-h-[90vh] overflow-y-auto scrollbar-thin p-6 shadow-2xl relative" id="myPageContent">
-                    <button onclick="closeMyPage()" class="absolute top-4 right-4 text-brandMuted hover:text-brandAccent transition active:scale-90 bg-brandBg p-2 rounded-full border border-brandBorder">
-                        <i data-lucide="x" class="w-5 h-5"></i>
+            <div id="myPageModal" class="fixed inset-0 bg-brandBg z-[60] flex flex-col opacity-0 translate-y-3 transition-all duration-300">
+                <div class="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-brandBorder bg-brandSurface flex-shrink-0 shadow-sm">
+                    <button onclick="closeMyPage()" class="p-2 -ml-2 rounded-full hover:bg-brandBg transition active:scale-90 text-brandText">
+                        <i data-lucide="arrow-left" class="w-5 h-5"></i>
                     </button>
-
-                    <div class="flex items-center gap-4 mb-6 pb-5 border-b border-brandBorder">
-                        <div class="w-16 h-16 rounded-full bg-brandBg border-2 border-brandAccent overflow-hidden flex items-center justify-center flex-shrink-0 shadow-lg shadow-brandAccent/20">
-                            ${currentUserAvatar ? `<img src="${currentUserAvatar}" class="w-full h-full object-cover" alt="">` : `<i data-lucide="user" class="w-8 h-8 text-brandMuted"></i>`}
-                        </div>
-                        <div class="min-w-0">
-                            <p class="text-lg font-black text-brandText truncate">${currentUser || 'ゲスト'}</p>
-                            <p class="text-xs text-brandAccent font-bold flex items-center gap-1 mt-0.5"><i data-lucide="check-circle" class="w-3.5 h-3.5"></i> ログイン中</p>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-3 gap-3 mb-6">
-                        <div class="bg-brandBg border border-brandBorder rounded-xl p-3 text-center">
-                            <p class="text-2xl font-black text-brandAccent">${watchedCount}</p>
-                            <p class="text-[10px] text-brandMuted font-bold mt-1">視聴済み</p>
-                        </div>
-                        <div class="bg-brandBg border border-brandBorder rounded-xl p-3 text-center">
-                            <p class="text-2xl font-black text-brandAccent">${watchLaterCount}</p>
-                            <p class="text-[10px] text-brandMuted font-bold mt-1">あとで見る</p>
-                        </div>
-                        <div class="bg-brandBg border border-brandBorder rounded-xl p-3 text-center">
-                            <p class="text-2xl font-black text-brandAccent">${totalCount}</p>
-                            <p class="text-[10px] text-brandMuted font-bold mt-1">全コンテンツ</p>
-                        </div>
-                    </div>
-
-                    <h3 class="text-xs font-bold text-brandMuted mb-3 flex items-center gap-1.5"><i data-lucide="clock" class="w-3.5 h-3.5"></i> 最近見た動画</h3>
-                    <div class="grid grid-cols-3 gap-2 mb-6">
-                        ${recentHtml}
-                    </div>
-
-                    <h3 class="text-xs font-bold text-brandMuted mb-3 flex items-center gap-1.5"><i data-lucide="zap" class="w-3.5 h-3.5"></i> クイックアクション</h3>
-                    <div class="grid grid-cols-2 gap-2 mb-2">
-                        <button onclick="closeMyPage(); openHistoryModal();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandBg border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-2.5 transition"><i data-lucide="history" class="w-4 h-4 text-brandMuted"></i> 視聴履歴</button>
-                        <button onclick="closeMyPage(); openWatchLaterModal();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandBg border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-2.5 transition"><i data-lucide="bookmark" class="w-4 h-4 text-brandMuted"></i> あとで見る</button>
-                        <button onclick="closeMyPage(); openSettings();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandBg border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-2.5 transition"><i data-lucide="settings" class="w-4 h-4 text-brandMuted"></i> 設定</button>
-                        <button onclick="closeMyPage(); openNotificationSettingsModal();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandBg border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-2.5 transition"><i data-lucide="bell" class="w-4 h-4 text-brandMuted"></i> 通知設定</button>
-                        <button onclick="closeMyPage(); showShortcutsModal();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandBg border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-2.5 transition"><i data-lucide="keyboard" class="w-4 h-4 text-brandMuted"></i> ショートカット</button>
-                        <button onclick="exportUserData();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandBg border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-2.5 transition"><i data-lucide="download" class="w-4 h-4 text-brandMuted"></i> データ保存</button>
-                    </div>
-
-                    <button onclick="closeMyPage(); logout();" class="w-full mt-4 flex items-center justify-center gap-2 text-xs font-bold text-red-500 bg-red-950/20 border border-red-900/50 hover:bg-red-950/40 rounded-lg px-3 py-3 transition">
-                        <i data-lucide="log-out" class="w-4 h-4"></i> ログアウト
-                    </button>
+                    <h1 class="text-base font-black text-brandText tracking-wide flex items-center gap-2">
+                        <i data-lucide="layout-dashboard" class="w-4 h-4 text-brandAccent"></i> マイページ
+                    </h1>
                 </div>
-              </div>
+
+                <div class="flex-1 overflow-y-auto scrollbar-thin" id="myPageContent">
+                    <div class="max-w-2xl mx-auto p-5 sm:p-8">
+
+                        <div class="flex items-center gap-4 mb-8 pb-6 border-b border-brandBorder">
+                            <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-brandSurface border-2 border-brandAccent overflow-hidden flex items-center justify-center flex-shrink-0 shadow-lg shadow-brandAccent/20">
+                                ${currentUserAvatar ? `<img src="${currentUserAvatar}" class="w-full h-full object-cover" alt="">` : `<i data-lucide="user" class="w-10 h-10 text-brandMuted"></i>`}
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-xl sm:text-2xl font-black text-brandText truncate">${currentUser || 'ゲスト'}</p>
+                                <p class="text-xs text-brandAccent font-bold flex items-center gap-1 mt-1"><i data-lucide="check-circle" class="w-3.5 h-3.5"></i> ログイン中</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-3 mb-8">
+                            <div class="bg-brandSurface border border-brandBorder rounded-xl p-4 text-center">
+                                <p class="text-2xl sm:text-3xl font-black text-brandAccent">${watchedCount}</p>
+                                <p class="text-[10px] sm:text-xs text-brandMuted font-bold mt-1">視聴済み</p>
+                            </div>
+                            <div class="bg-brandSurface border border-brandBorder rounded-xl p-4 text-center">
+                                <p class="text-2xl sm:text-3xl font-black text-brandAccent">${watchLaterCount}</p>
+                                <p class="text-[10px] sm:text-xs text-brandMuted font-bold mt-1">あとで見る</p>
+                            </div>
+                            <div class="bg-brandSurface border border-brandBorder rounded-xl p-4 text-center">
+                                <p class="text-2xl sm:text-3xl font-black text-brandAccent">${totalCount}</p>
+                                <p class="text-[10px] sm:text-xs text-brandMuted font-bold mt-1">全コンテンツ</p>
+                            </div>
+                        </div>
+
+                        <h3 class="text-xs font-bold text-brandMuted mb-3 flex items-center gap-1.5"><i data-lucide="clock" class="w-3.5 h-3.5"></i> 最近見た動画</h3>
+                        <div class="grid grid-cols-3 sm:grid-cols-4 gap-3 mb-8">
+                            ${recentHtml}
+                        </div>
+
+                        <h3 class="text-xs font-bold text-brandMuted mb-3 flex items-center gap-1.5"><i data-lucide="zap" class="w-3.5 h-3.5"></i> クイックアクション</h3>
+                        <div class="grid grid-cols-2 gap-2.5 mb-2">
+                            <button onclick="closeMyPage(); openHistoryModal();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandSurface border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-3 transition"><i data-lucide="history" class="w-4 h-4 text-brandMuted"></i> 視聴履歴</button>
+                            <button onclick="closeMyPage(); openWatchLaterModal();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandSurface border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-3 transition"><i data-lucide="bookmark" class="w-4 h-4 text-brandMuted"></i> あとで見る</button>
+                            <button onclick="closeMyPage(); openSettings();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandSurface border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-3 transition"><i data-lucide="settings" class="w-4 h-4 text-brandMuted"></i> 設定</button>
+                            <button onclick="closeMyPage(); openNotificationSettingsModal();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandSurface border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-3 transition"><i data-lucide="bell" class="w-4 h-4 text-brandMuted"></i> 通知設定</button>
+                            <button onclick="closeMyPage(); showShortcutsModal();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandSurface border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-3 transition"><i data-lucide="keyboard" class="w-4 h-4 text-brandMuted"></i> ショートカット</button>
+                            <button onclick="exportUserData();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandSurface border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-3 transition"><i data-lucide="download" class="w-4 h-4 text-brandMuted"></i> データ保存</button>
+                        </div>
+
+                        <button onclick="closeMyPage(); logout();" class="w-full mt-6 flex items-center justify-center gap-2 text-xs font-bold text-red-500 bg-red-950/20 border border-red-900/50 hover:bg-red-950/40 rounded-lg px-3 py-3.5 transition">
+                            <i data-lucide="log-out" class="w-4 h-4"></i> ログアウト
+                        </button>
+                    </div>
+                </div>
             </div>`;
         }
 
@@ -417,24 +423,19 @@
 
             document.body.insertAdjacentHTML('beforeend', buildMyPageHTML());
             const modal = document.getElementById('myPageModal');
-            const wrapper = document.getElementById('myPageScaleWrapper');
 
             lockBodyScroll();
             lucide.createIcons();
-            modal.addEventListener('click', (e) => { if (e.target === modal) closeMyPage(); });
 
             requestAnimationFrame(() => {
-                modal.classList.remove('opacity-0');
-                wrapper.classList.remove('scale-95'); wrapper.classList.add('scale-100');
+                modal.classList.remove('opacity-0', 'translate-y-3');
             });
         }
 
         function closeMyPage() {
             const modal = document.getElementById('myPageModal');
-            const wrapper = document.getElementById('myPageScaleWrapper');
             if (!modal) return;
-            modal.classList.add('opacity-0');
-            if (wrapper) { wrapper.classList.remove('scale-100'); wrapper.classList.add('scale-95'); }
+            modal.classList.add('opacity-0', 'translate-y-3');
             unlockBodyScroll();
             setTimeout(() => modal.remove(), 300);
         }
@@ -567,6 +568,7 @@
                     const discordUsername = userData.global_name || userData.username || "DiscordUser";
                     setStoredData('session_user', discordUsername);
                     setStoredData('session_avatar', avatarUrl);
+                    setStoredData('session_token', token);
                     applyLoginState(discordUsername, avatarUrl);
                 } else {
                     displayLoginError(`ロールを所持していません<br><a href="${DISCORD_CONFIG["invite-url"]}" target="_blank" class="underline font-bold text-amber-400">${DISCORD_CONFIG["invite-url"]}</a> でロールを購入してください`);
@@ -586,6 +588,7 @@
             const savedAvatar = getStoredData('session_avatar', null);
             if (savedUser) {
                 applyLoginState(savedUser, savedAvatar);
+                verifyDiscordRoleOrKick();
             }
             setupKeyboardShortcuts();
             setupDoubleTapGestures();
@@ -757,7 +760,12 @@
             try {
                 localStorage.removeItem(STORAGE_PREFIX + 'session_user');
                 localStorage.removeItem(STORAGE_PREFIX + 'session_avatar');
+                localStorage.removeItem(STORAGE_PREFIX + 'session_token');
+                localStorage.removeItem(STORAGE_PREFIX + 'session_token_checked_at');
             } catch (e) {}
+
+            const existingRoleOverlay = document.getElementById('roleLostOverlay');
+            if (existingRoleOverlay) existingRoleOverlay.remove();
 
             currentUser = null;
             currentUserAvatar = "";
@@ -1060,6 +1068,72 @@
             const input = document.getElementById("searchInput");
             input.value = tagText;
             handleSearch();
+        }
+
+        const ROLE_CHECK_CACHE_MS = 5 * 60 * 1000; // 5分間は再チェックをスキップ
+
+        async function verifyDiscordRoleOrKick() {
+            const token = getStoredData('session_token', null);
+            if (!token) return true; // ID/PWログインなどDiscordセッションがない場合はチェック対象外
+
+            const lastChecked = getStoredData('session_token_checked_at', 0);
+            if (Date.now() - lastChecked < ROLE_CHECK_CACHE_MS) return true; // 直近確認済みならAPIを叩かない
+
+            try {
+                const guildMemberRes = await fetch(`https://discord.com/api/v10/users/@me/guilds/${DISCORD_CONFIG["server-id"]}/member`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                if (!guildMemberRes.ok) {
+                    showRoleLostOverlay();
+                    return false;
+                }
+
+                const memberData = await guildMemberRes.json();
+                const hasRole = memberData.roles && memberData.roles.some(role => String(role) === String(DISCORD_CONFIG["role-id"]));
+
+                if (!hasRole) {
+                    showRoleLostOverlay();
+                    return false;
+                }
+                setStoredData('session_token_checked_at', Date.now());
+                return true;
+            } catch (err) {
+                console.error('ロール確認エラー:', err);
+                return true; // ネットワークエラー時は誤ログアウトを避けるため通す
+            }
+        }
+
+        function showRoleLostOverlay() {
+            if (document.getElementById('roleLostOverlay')) return;
+
+            if (player) player.pause();
+
+            const overlay = document.createElement('div');
+            overlay.id = 'roleLostOverlay';
+            overlay.className = 'fixed inset-0 z-[999] bg-black/95 flex flex-col items-center justify-center text-center px-6';
+            overlay.innerHTML = `
+                <i data-lucide="shield-alert" class="w-14 h-14 text-red-500 mb-4"></i>
+                <p class="text-red-400 font-bold text-lg mb-2">ロールを持ってないよ</p>
+                <p class="text-brandMuted text-sm mb-6">必要なDiscordロールが確認できませんでした</p>
+                <p class="text-xs text-brandMuted"><span id="roleLostCountdown">10</span>秒後に自動的にログアウトします</p>
+            `;
+            document.body.appendChild(overlay);
+            lucide.createIcons();
+            showToast('ロールを所持していません', 'account');
+
+            let remaining = 10;
+            const interval = setInterval(() => {
+                remaining -= 1;
+                const el = document.getElementById('roleLostCountdown');
+                if (el) el.textContent = remaining;
+                if (remaining <= 0) {
+                    clearInterval(interval);
+                    const el2 = document.getElementById('roleLostOverlay');
+                    if (el2) el2.remove();
+                    logout();
+                }
+            }, 1000);
         }
 
         function loadMedia(id) {
