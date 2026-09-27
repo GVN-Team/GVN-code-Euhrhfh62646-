@@ -155,3 +155,21 @@
         .double-tap-ripple {
             animation: rippleEffect 0.5s ease-out forwards;
         }
+
+        @keyframes roleOverlaySlideUp {
+            0% { transform: translateY(100%); }
+            100% { transform: translateY(0); }
+        }
+        #roleLostOverlay {
+            animation: roleOverlaySlideUp 0.35s ease-out;
+        }
+
+        @keyframes roleNoticeFade {
+            0% { opacity: 0; transform: translateY(6px); }
+            10% { opacity: 1; transform: translateY(0); }
+            75% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        #roleLostNotice {
+            animation: roleNoticeFade 3s ease forwards;
+        }
