@@ -1102,9 +1102,25 @@
         }
 
         function showRoleLostOverlay() {
+            if (document.getElementById('roleLostOverlay')) return;
+
             if (player) player.pause();
-            showToast('ロールを所持していません。ログアウトします', 'account');
-            logout();
+
+            const overlay = document.createElement('div');
+            overlay.id = 'roleLostOverlay';
+            overlay.className = 'fixed inset-0 z-[999] bg-black/95 flex items-center justify-center px-6';
+            overlay.innerHTML = `
+                <div id="roleLostNotice" class="border-2 border-red-500 rounded-xl px-6 py-4 bg-black/80 text-center">
+                    <p class="text-red-400 font-bold text-base">ロールを持っていません</p>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            setTimeout(() => {
+                const overlayEl = document.getElementById('roleLostOverlay');
+                if (overlayEl) overlayEl.remove();
+                logout();
+            }, 5000);
         }
 
         function loadMedia(id) {
