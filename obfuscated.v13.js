@@ -764,9 +764,6 @@
                 localStorage.removeItem(STORAGE_PREFIX + 'session_token_checked_at');
             } catch (e) {}
 
-            const existingRoleOverlay = document.getElementById('roleLostOverlay');
-            if (existingRoleOverlay) existingRoleOverlay.remove();
-
             currentUser = null;
             currentUserAvatar = "";
             window.currentUser = null;
@@ -1105,35 +1102,9 @@
         }
 
         function showRoleLostOverlay() {
-            if (document.getElementById('roleLostOverlay')) return;
-
             if (player) player.pause();
-
-            const overlay = document.createElement('div');
-            overlay.id = 'roleLostOverlay';
-            overlay.className = 'fixed inset-0 z-[999] bg-black/95 flex flex-col items-center justify-center text-center px-6';
-            overlay.innerHTML = `
-                <i data-lucide="shield-alert" class="w-14 h-14 text-red-500 mb-4"></i>
-                <p class="text-red-400 font-bold text-lg mb-2">ロールを持ってないよ</p>
-                <p class="text-brandMuted text-sm mb-6">必要なDiscordロールが確認できませんでした</p>
-                <p class="text-xs text-brandMuted"><span id="roleLostCountdown">10</span>秒後に自動的にログアウトします</p>
-            `;
-            document.body.appendChild(overlay);
-            lucide.createIcons();
-            showToast('ロールを所持していません', 'account');
-
-            let remaining = 10;
-            const interval = setInterval(() => {
-                remaining -= 1;
-                const el = document.getElementById('roleLostCountdown');
-                if (el) el.textContent = remaining;
-                if (remaining <= 0) {
-                    clearInterval(interval);
-                    const el2 = document.getElementById('roleLostOverlay');
-                    if (el2) el2.remove();
-                    logout();
-                }
-            }, 1000);
+            showToast('ロールを所持していません。ログアウトします', 'account');
+            logout();
         }
 
         function loadMedia(id) {
