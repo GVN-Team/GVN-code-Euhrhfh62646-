@@ -487,6 +487,7 @@
             const btnArea = document.getElementById('loginBtnContainer');
             const loadArea = document.getElementById('loadingArea');
 
+            clearInterval(dotInterval);
             loadArea.classList.add('hidden');
             loadArea.classList.remove('flex');
             btnArea.classList.remove('hidden');
@@ -520,9 +521,18 @@
             loadArea.classList.remove('hidden');
             loadArea.classList.add('flex');
             
+            const loadMsg = document.getElementById('loadingMsg');
+            const wait = (ms) => new Promise(r => setTimeout(r, ms));
+            const setStep = async (msg) => {
+                if (loadMsg) loadMsg.textContent = msg;
+                await wait(300);
+            };
             if (loadTextContainer) {
-                loadTextContainer.classList.add('hidden');
+                loadTextContainer.classList.remove('hidden');
             }
+            clearInterval(dotInterval);
+            startDots();
+            await setStep('DiscordのAPIを取得しています');
 
             window.history.replaceState({}, document.title, window.location.pathname);
 
@@ -534,6 +544,7 @@
                     return;
                 }
 
+                await setStep('ユーザー情報を取得しています');
                 const userRes = await fetch('https://discord.com/api/v10/users/@me', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
@@ -552,6 +563,7 @@
                     avatarUrl = `https://cdn.discordapp.com/embed/avatars/${defaultIndex}.png`;
                 }
 
+                await setStep('サーバーのメンバー情報を取得しています');
                 const guildMemberRes = await fetch(`https://discord.com/api/v10/users/@me/guilds/${DISCORD_CONFIG["server-id"]}/member`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
@@ -562,9 +574,12 @@
                 }
 
                 const memberData = await guildMemberRes.json();
+                await setStep('ロールを確認しています');
                 const hasRole = memberData.roles && memberData.roles.some(role => String(role) === String(DISCORD_CONFIG["role-id"]));
 
                 if (hasRole) {
+                    await setStep('ログイン情報を保存しています');
+                    clearInterval(dotInterval);
                     const discordUsername = userData.global_name || userData.username || "DiscordUser";
                     setStoredData('session_user', discordUsername);
                     setStoredData('session_avatar', avatarUrl);
@@ -756,7 +771,7 @@
             if (menu) menu.classList.add('hidden');
         }
 
-        function logout() {
+        function logout(silent) {
             try {
                 localStorage.removeItem(STORAGE_PREFIX + 'session_user');
                 localStorage.removeItem(STORAGE_PREFIX + 'session_avatar');
@@ -794,7 +809,7 @@
             document.getElementById('loginBtnContainer').classList.remove('hidden');
             document.getElementById('loginError').classList.add('hidden');
             
-            showToast("ログアウトしました", "account");
+            if (silent !== true) showToast("ログアウトしました", "account");
         }
 
         document.addEventListener('click', (e) => {
@@ -1108,19 +1123,33 @@
 
             const overlay = document.createElement('div');
             overlay.id = 'roleLostOverlay';
-            overlay.className = 'fixed inset-0 z-[999] bg-black/95 flex items-center justify-center px-6';
+            overlay.className = 'fixed inset-0 z-[999] bg-black/95 flex overflow-y-auto px-6 py-10';
             overlay.innerHTML = `
-                <div id="roleLostNotice" class="border-2 border-red-500 rounded-xl px-6 py-4 bg-black/80 text-center">
-                    <p class="text-red-400 font-bold text-base">ロールを持っていません</p>
+                <div class="max-w-xl m-auto text-center">
+                    <p class="text-red-400 font-bold text-xl mb-5">ロールを持ってないよ</p>
+                    <p class="text-brandMuted text-sm leading-loose">このアカウントには、当サイトのコンテンツを閲覧するために必要なDiscordロールが現在付与されていないことが確認されました。ロールが外れてしまった場合や、購入や付与の手続きがまだ完了していない場合、あるいはDiscordサーバーから退出してしまっている場合など、いくつかの原因が考えられますが、いずれの場合であっても、このまま閲覧を続けることはできません。セキュリティ保護のため、このメッセージが表示されてから5秒後にあなたのアカウントは自動的にログアウトされ、この端末に保存されていたログイン情報やセッションもすべて削除されます。再びご利用いただくには、Discordサーバーで必要なロールを取得したうえで、もう一度ログインし直してください。それでは、またのご利用を心よりお待ちしております。</p>
                 </div>
             `;
             document.body.appendChild(overlay);
 
             setTimeout(() => {
-                const overlayEl = document.getElementById('roleLostOverlay');
-                if (overlayEl) overlayEl.remove();
-                logout();
+                overlay.remove();
+                logout(true);
+                showRoleLostNotice();
             }, 5000);
+        }
+
+        function showRoleLostNotice() {
+            const wrap = document.createElement('div');
+            wrap.id = 'roleLostNoticeWrap';
+            wrap.className = 'fixed inset-0 z-[1000] flex items-center justify-center pointer-events-none px-6';
+            wrap.innerHTML = `
+                <div id="roleLostNotice" class="border-2 border-red-500 rounded-xl px-6 py-4 bg-black/80 text-center">
+                    <p class="text-red-400 font-bold text-base">ロールを持っていません</p>
+                </div>
+            `;
+            document.body.appendChild(wrap);
+            setTimeout(() => wrap.remove(), 3100);
         }
 
         function loadMedia(id) {
