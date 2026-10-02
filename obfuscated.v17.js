@@ -4,16 +4,27 @@
     let auth = null;
     let authUser = null;
 
+    let firestoreReadyResolve;
+    window.firestoreReady = new Promise((resolve) => { firestoreReadyResolve = resolve; });
+
     if (typeof __firebase_config !== 'undefined' && __firebase_config) {
         try {
             const { initializeApp } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js');
             const { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js');
-            const { getFirestore } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
+            const {
+                getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs,
+                deleteDoc, onSnapshot, query, orderBy, serverTimestamp
+            } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
 
             const firebaseConfig = JSON.parse(__firebase_config);
             const app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
+
+            window.firestoreFns = {
+                collection, doc, addDoc, setDoc, getDoc, getDocs,
+                deleteDoc, onSnapshot, query, orderBy, serverTimestamp
+            };
 
             const initAuth = async () => {
                 try {
@@ -22,7 +33,11 @@
                     } else {
                         await signInAnonymously(auth);
                     }
-                } catch (err) {}
+                } catch (err) {
+                    console.error('Firebase認証エラー:', err);
+                } finally {
+                    firestoreReadyResolve();
+                }
             };
             initAuth();
 
@@ -32,7 +47,12 @@
                     if (typeof syncUserDataFromCloud === 'function') syncUserDataFromCloud();
                 }
             });
-        } catch (e) {}
+        } catch (e) {
+            console.error('Firebase初期化エラー:', e);
+            firestoreReadyResolve();
+        }
+    } else {
+        firestoreReadyResolve();
     }
 
     window.db = db;
@@ -689,6 +709,7 @@
             userResumeTimes = getStoredData('resumes_' + currentUser, {});
 
             window.currentUser = currentUser;
+            updateAddVideoButtonVisibility();
             
             if (window.db && window.getAuthUser && window.getAuthUser()) {
                 syncUserDataFromCloud(); 
@@ -710,6 +731,7 @@
             mainContent.classList.remove('hidden');
             mainContent.classList.add('flex');
             initPlayer();
+            initVideosFromFirestore();
         }
 
         async function syncUserDataFromCloud() {
@@ -1025,7 +1047,112 @@
             lucide.createIcons();
         }
 
-        const videos = videosData;
+        let videos = Array.isArray(videosData) ? videosData.slice() : [];
+
+        function getVideosCollectionRef() {
+            if (!window.db || !window.firestoreFns) return null;
+            return window.firestoreFns.collection(window.db, 'sites', window.APP_UNIQUE_ID, 'videos');
+        }
+
+        async function initVideosFromFirestore() {
+            await window.firestoreReady;
+            if (!window.db || !window.firestoreFns) return; // Firebase未設定・接続失敗時はconfig.jsの静的データのまま動く
+
+            const { query, orderBy, onSnapshot, getDocs, addDoc, serverTimestamp } = window.firestoreFns;
+            const videosRef = getVideosCollectionRef();
+            const q = query(videosRef, orderBy('id', 'asc'));
+
+            try {
+                const snapshot = await getDocs(q);
+                if (snapshot.empty && Array.isArray(videosData) && videosData.length > 0) {
+                    for (const v of videosData) {
+                        await addDoc(videosRef, { ...v, createdAt: serverTimestamp() });
+                    }
+                }
+            } catch (err) {
+                console.error('Firestore初期移行エラー:', err);
+            }
+
+            onSnapshot(q, (snap) => {
+                const docs = [];
+                snap.forEach(d => docs.push({ ...d.data(), _docId: d.id }));
+                if (docs.length > 0) {
+                    videos = docs;
+                    renderPlaylist();
+                }
+            }, (err) => {
+                console.error('Firestore購読エラー:', err);
+            });
+        }
+
+        function isAdmin() {
+            return Array.isArray(ADMIN_USERNAMES) && !!currentUser && ADMIN_USERNAMES.includes(currentUser);
+        }
+
+        function updateAddVideoButtonVisibility() {
+            const btn = document.getElementById('addVideoBtn');
+            if (!btn) return;
+            btn.classList.toggle('hidden', !isAdmin());
+        }
+
+        function openAddVideoModal() {
+            if (!isAdmin()) return;
+            document.getElementById('addVideoForm').reset();
+            toggleAddVideoFields();
+            document.getElementById('addVideoModal').classList.remove('hidden');
+        }
+
+        function closeAddVideoModal() {
+            document.getElementById('addVideoModal').classList.add('hidden');
+        }
+
+        function toggleAddVideoFields() {
+            const isImage = document.getElementById('addVideoType').value === 'image';
+            document.getElementById('addVideoUrlField').classList.toggle('hidden', isImage);
+            document.getElementById('addVideoImagesField').classList.toggle('hidden', !isImage);
+        }
+
+        async function submitAddVideo(event) {
+            event.preventDefault();
+            if (!isAdmin()) return;
+
+            const videosRef = getVideosCollectionRef();
+            if (!videosRef || !window.firestoreFns) {
+                showToast('データベースに接続できていません', 'system');
+                return;
+            }
+
+            const type = document.getElementById('addVideoType').value;
+            const nextId = videos.length > 0 ? Math.max(...videos.map(v => v.id || 0)) + 1 : 1;
+
+            const newVideo = {
+                id: nextId,
+                type,
+                title: document.getElementById('addVideoTitle').value.trim(),
+                thumbnail: document.getElementById('addVideoThumbnail').value.trim(),
+                duration: document.getElementById('addVideoDuration').value.trim(),
+                date: document.getElementById('addVideoDate').value.trim(),
+                desc: document.getElementById('addVideoDesc').value.trim()
+            };
+
+            if (type === 'image') {
+                newVideo.images = document.getElementById('addVideoImages').value
+                    .split('\n')
+                    .map(s => s.trim())
+                    .filter(s => s.length > 0);
+            } else {
+                newVideo.url = document.getElementById('addVideoUrl').value.trim();
+            }
+
+            try {
+                await window.firestoreFns.addDoc(videosRef, { ...newVideo, createdAt: window.firestoreFns.serverTimestamp() });
+                closeAddVideoModal();
+                showToast('追加しました', 'system');
+            } catch (err) {
+                console.error('動画追加エラー:', err);
+                showToast('追加に失敗しました', 'system');
+            }
+        }
 
         let activeId = 1;
         const player = document.getElementById("mainPlayer");
