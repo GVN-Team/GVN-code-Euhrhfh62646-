@@ -1126,7 +1126,7 @@
             overlay.className = 'fixed inset-0 z-[999] bg-black/95 flex overflow-y-auto px-6 py-10';
             overlay.innerHTML = `
                 <div class="max-w-xl m-auto text-center">
-                    <p class="text-red-400 font-bold text-xl mb-5">ロールを持ってないよ</p>
+                    <p class="font-bold text-xl mb-5" style="color:#ff0000;">ロールを持っていません</p>
                     <p class="text-brandMuted text-sm leading-loose">このアカウントには、当サイトのコンテンツを閲覧するために必要なDiscordロールが現在付与されていないことが確認されました。ロールが外れてしまった場合や、購入や付与の手続きがまだ完了していない場合、あるいはDiscordサーバーから退出してしまっている場合など、いくつかの原因が考えられますが、いずれの場合であっても、このまま閲覧を続けることはできません。セキュリティ保護のため、このメッセージが表示されてから5秒後にあなたのアカウントは自動的にログアウトされ、この端末に保存されていたログイン情報やセッションもすべて削除されます。再びご利用いただくには、Discordサーバーで必要なロールを取得したうえで、もう一度ログインし直してください。それでは、またのご利用を心よりお待ちしております。</p>
                 </div>
             `;
