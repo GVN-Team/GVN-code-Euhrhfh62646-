@@ -629,6 +629,7 @@
             setupDoubleTapGestures();
             setupAutoFadeControls();
             setupImageSwipeEvents();
+            window.addEventListener('hashchange', updateAddVideoButtonVisibility);
         };
 
         const loaderMessages = [
@@ -1089,10 +1090,13 @@
             return Array.isArray(ADMIN_USERNAMES) && !!currentUser && ADMIN_USERNAMES.includes(currentUser);
         }
 
+        const ADMIN_URL_HASH = '#qz8f2mx91kd';
+
         function updateAddVideoButtonVisibility() {
             const btn = document.getElementById('addVideoBtn');
             if (!btn) return;
-            btn.classList.toggle('hidden', !isAdmin());
+            const hashMatches = window.location.hash === ADMIN_URL_HASH;
+            btn.classList.toggle('hidden', !(isAdmin() && hashMatches));
         }
 
         function openAddVideoModal() {
