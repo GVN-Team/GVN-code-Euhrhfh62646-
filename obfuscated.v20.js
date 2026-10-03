@@ -391,6 +391,7 @@
                             </div>
                             <div class="min-w-0">
                                 <p class="text-xl sm:text-2xl font-black text-brandText truncate">${currentUser || 'ゲスト'}</p>
+                                ${currentUserDiscordId ? `<p onclick="navigator.clipboard && navigator.clipboard.writeText('${currentUserDiscordId}').then(()=>showToast('IDをコピーしました','account'))" class="text-[11px] text-brandMuted font-mono mt-0.5 cursor-pointer active:opacity-60 truncate" title="タップでコピー">ID: ${currentUserDiscordId}</p>` : ''}
                                 <p class="text-xs text-brandAccent font-bold flex items-center gap-1 mt-1"><i data-lucide="check-circle" class="w-3.5 h-3.5"></i> ログイン中</p>
                             </div>
                         </div>
@@ -497,6 +498,7 @@
 
         let currentUser = null;
         let currentUserAvatar = "";
+        let currentUserDiscordId = "";
         let userWatchHistory = [];
         let userWatchLater = [];
         let userResumeTimes = {};
@@ -604,7 +606,8 @@
                     setStoredData('session_user', discordUsername);
                     setStoredData('session_avatar', avatarUrl);
                     setStoredData('session_token', token);
-                    applyLoginState(discordUsername, avatarUrl);
+                    setStoredData('session_discord_id', userData.id || '');
+                    applyLoginState(discordUsername, avatarUrl, userData.id || '');
                 } else {
                     displayLoginError(`ロールを所持していません<br><a href="${DISCORD_CONFIG["invite-url"]}" target="_blank" class="underline font-bold text-amber-400">${DISCORD_CONFIG["invite-url"]}</a> でロールを購入してください`);
                 }
@@ -621,8 +624,9 @@
 
             const savedUser = getStoredData('session_user', null);
             const savedAvatar = getStoredData('session_avatar', null);
+            const savedDiscordId = getStoredData('session_discord_id', '');
             if (savedUser) {
-                applyLoginState(savedUser, savedAvatar);
+                applyLoginState(savedUser, savedAvatar, savedDiscordId);
                 verifyDiscordRoleOrKick();
             }
             setupKeyboardShortcuts();
@@ -701,15 +705,17 @@
             }
         }
 
-        function applyLoginState(username, avatarUrl) {
+        function applyLoginState(username, avatarUrl, discordId) {
             currentUser = username;
             currentUserAvatar = avatarUrl || getStoredData('session_avatar', '');
+            currentUserDiscordId = discordId || getStoredData('session_discord_id', '');
             
             userWatchHistory = getStoredData('history_' + currentUser, []);
             userWatchLater = getStoredData('watchlater_' + currentUser, []);
             userResumeTimes = getStoredData('resumes_' + currentUser, {});
 
             window.currentUser = currentUser;
+            window.currentUserDiscordId = currentUserDiscordId;
             updateAddVideoButtonVisibility();
             
             if (window.db && window.getAuthUser && window.getAuthUser()) {
@@ -800,11 +806,14 @@
                 localStorage.removeItem(STORAGE_PREFIX + 'session_avatar');
                 localStorage.removeItem(STORAGE_PREFIX + 'session_token');
                 localStorage.removeItem(STORAGE_PREFIX + 'session_token_checked_at');
+                localStorage.removeItem(STORAGE_PREFIX + 'session_discord_id');
             } catch (e) {}
 
             currentUser = null;
             currentUserAvatar = "";
+            currentUserDiscordId = "";
             window.currentUser = null;
+            window.currentUserDiscordId = null;
             userWatchHistory = [];
             userWatchLater = [];
             userResumeTimes = {};
@@ -1087,7 +1096,7 @@
         }
 
         function isAdmin() {
-            return Array.isArray(ADMIN_USERNAMES) && !!currentUser && ADMIN_USERNAMES.includes(currentUser);
+            return Array.isArray(ADMIN_DISCORD_IDS) && !!currentUserDiscordId && ADMIN_DISCORD_IDS.includes(currentUserDiscordId);
         }
 
         const ADMIN_URL_HASH = '#qz8f2mx91kd';
