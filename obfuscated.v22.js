@@ -1443,6 +1443,7 @@
 
         function confirmResume(shouldResume) {
             document.getElementById('resumeModal').classList.add('hidden');
+            unlockBodyScroll();
             if (shouldResume && pendingResumeTime > 0) {
                 player.currentTime = pendingResumeTime;
                 showToast(`続きから再生 (${formatTime(pendingResumeTime)})`, 'resume');
