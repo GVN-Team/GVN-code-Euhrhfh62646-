@@ -1089,9 +1089,7 @@
                 if (docs.length > 0) {
                     videos = docs;
                     renderPlaylist();
-                    if (!hasLoadedInitialMedia) {
-                        loadInitialMedia();
-                    }
+                    // 初回表示の確実な読み込みは forceLoadIdOneUntilReady 側の連続試行に任せる
                 }
             }, (err) => {
                 console.error('Firestore購読エラー:', err);
@@ -1188,12 +1186,25 @@
         const playlistContainer = document.getElementById("playlist");
         const videoSpinner = document.getElementById("videoSpinner");
 
-        function loadInitialMedia() {
-            const originalAutoPlay = appConfig.autoPlay;
-            appConfig.autoPlay = false;
-            loadMedia(activeId);
-            appConfig.autoPlay = originalAutoPlay;
-            hasLoadedInitialMedia = true;
+        function forceLoadIdOneUntilReady() {
+            const intervalMs = 150;
+            const keepGoingAfterSuccessMs = 2000;
+            let successAt = null;
+
+            const timer = setInterval(() => {
+                const originalAutoPlay = appConfig.autoPlay;
+                appConfig.autoPlay = false;
+                loadMedia(activeId);
+                appConfig.autoPlay = originalAutoPlay;
+
+                if (videos.some(v => v.id === activeId)) {
+                    hasLoadedInitialMedia = true;
+                    if (successAt === null) successAt = Date.now();
+                    if (Date.now() - successAt >= keepGoingAfterSuccessMs) {
+                        clearInterval(timer);
+                    }
+                }
+            }, intervalMs);
         }
 
         function initPlayer() {
@@ -1201,11 +1212,7 @@
             const vParam = parseInt(params.get('v'));
             if (vParam && videos.find(v => v.id === vParam)) { activeId = vParam; } else { activeId = 1; }
 
-            // Firestoreからのデータ到着を待つ(initVideosFromFirestoreが呼ぶ)。
-            // Firebase未設定・接続失敗時のみ、ここでフォールバックのデータで読み込む。
-            if (!window.db || !window.firestoreFns) {
-                loadInitialMedia();
-            }
+            forceLoadIdOneUntilReady();
 
             renderPlaylist();
             renderExternalLinks(); 
