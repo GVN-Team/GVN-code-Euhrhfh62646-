@@ -1089,6 +1089,9 @@
                 if (docs.length > 0) {
                     videos = docs;
                     renderPlaylist();
+                    if (!hasLoadedInitialMedia) {
+                        loadMedia(activeId);
+                    }
                 }
             }, (err) => {
                 console.error('Firestore購読エラー:', err);
@@ -1168,6 +1171,7 @@
         }
 
         let activeId = 1;
+        let hasLoadedInitialMedia = false;
         const player = document.getElementById("mainPlayer");
         const playerSrc = document.getElementById("playerSource");
         const vTitle = document.getElementById("videoTitle");
@@ -1296,6 +1300,7 @@
             const v = videos.find(item => item.id === id);
             if (!v) return;
             activeId = id;
+            hasLoadedInitialMedia = true;
             
             vTitle.textContent = v.title;
             vDate.textContent = `公開日: ${v.date}`;
