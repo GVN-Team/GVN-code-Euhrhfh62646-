@@ -1090,7 +1090,7 @@
                     videos = docs;
                     renderPlaylist();
                     if (!hasLoadedInitialMedia) {
-                        loadMedia(activeId);
+                        loadInitialMedia();
                     }
                 }
             }, (err) => {
@@ -1188,16 +1188,25 @@
         const playlistContainer = document.getElementById("playlist");
         const videoSpinner = document.getElementById("videoSpinner");
 
+        function loadInitialMedia() {
+            const originalAutoPlay = appConfig.autoPlay;
+            appConfig.autoPlay = false;
+            loadMedia(activeId);
+            appConfig.autoPlay = originalAutoPlay;
+            hasLoadedInitialMedia = true;
+        }
+
         function initPlayer() {
             const params = new URLSearchParams(window.location.search);
             const vParam = parseInt(params.get('v'));
             if (vParam && videos.find(v => v.id === vParam)) { activeId = vParam; } else { activeId = 1; }
-            
-            const originalAutoPlay = appConfig.autoPlay;
-            appConfig.autoPlay = false; 
-            loadMedia(activeId); 
-            appConfig.autoPlay = originalAutoPlay;
-            
+
+            // Firestoreからのデータ到着を待つ(initVideosFromFirestoreが呼ぶ)。
+            // Firebase未設定・接続失敗時のみ、ここでフォールバックのデータで読み込む。
+            if (!window.db || !window.firestoreFns) {
+                loadInitialMedia();
+            }
+
             renderPlaylist();
             renderExternalLinks(); 
             lucide.createIcons();
@@ -1300,7 +1309,6 @@
             const v = videos.find(item => item.id === id);
             if (!v) return;
             activeId = id;
-            hasLoadedInitialMedia = true;
             
             vTitle.textContent = v.title;
             vDate.textContent = `公開日: ${v.date}`;
