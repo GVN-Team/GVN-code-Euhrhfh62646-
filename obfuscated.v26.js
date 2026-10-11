@@ -1188,22 +1188,17 @@
 
         function forceLoadIdOneUntilReady() {
             const intervalMs = 150;
-            const keepGoingAfterSuccessMs = 2000;
-            let successAt = null;
 
             const timer = setInterval(() => {
+                if (!videos.some(v => v.id === activeId)) return;
+
                 const originalAutoPlay = appConfig.autoPlay;
                 appConfig.autoPlay = false;
                 loadMedia(activeId);
                 appConfig.autoPlay = originalAutoPlay;
 
-                if (videos.some(v => v.id === activeId)) {
-                    hasLoadedInitialMedia = true;
-                    if (successAt === null) successAt = Date.now();
-                    if (Date.now() - successAt >= keepGoingAfterSuccessMs) {
-                        clearInterval(timer);
-                    }
-                }
+                hasLoadedInitialMedia = true;
+                clearInterval(timer);
             }, intervalMs);
         }
 
