@@ -1188,17 +1188,31 @@
 
         function forceLoadIdOneUntilReady() {
             const intervalMs = 150;
+            const burstIntervalMs = 10;
+            const burstDurationMs = 100;
 
-            const timer = setInterval(() => {
-                if (!videos.some(v => v.id === activeId)) return;
-
+            const attemptLoad = () => {
                 const originalAutoPlay = appConfig.autoPlay;
                 appConfig.autoPlay = false;
                 loadMedia(activeId);
                 appConfig.autoPlay = originalAutoPlay;
+            };
 
+            // 届くまでは無期限に試行し続ける
+            const timer = setInterval(() => {
+                if (!videos.some(v => v.id === activeId)) return;
+
+                attemptLoad();
                 hasLoadedInitialMedia = true;
                 clearInterval(timer);
+
+                // 届いた直後の0.1秒だけ、0.01秒間隔で念押しに再読み込みする
+                let burstElapsed = 0;
+                const burstTimer = setInterval(() => {
+                    attemptLoad();
+                    burstElapsed += burstIntervalMs;
+                    if (burstElapsed >= burstDurationMs) clearInterval(burstTimer);
+                }, burstIntervalMs);
             }, intervalMs);
         }
 
