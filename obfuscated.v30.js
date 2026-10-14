@@ -1,28 +1,3 @@
-(function setupOnScreenDebugLog() {
-    const box = document.createElement('div');
-    box.id = 'debugLogBox';
-    box.style.cssText = 'position:fixed;left:0;right:0;bottom:0;max-height:40vh;overflow-y:auto;' +
-        'background:rgba(0,0,0,0.92);color:#0f0;font-family:monospace;font-size:10px;' +
-        'padding:8px;z-index:99999;white-space:pre-wrap;word-break:break-all;line-height:1.4;';
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = '✕ ログを閉じる';
-    closeBtn.style.cssText = 'display:block;margin-bottom:6px;background:#333;color:#fff;border:none;' +
-        'padding:6px 10px;border-radius:6px;font-size:10px;';
-    closeBtn.onclick = () => box.remove();
-    box.appendChild(closeBtn);
-    document.addEventListener('DOMContentLoaded', () => document.body.appendChild(box));
-    if (document.body) document.body.appendChild(box);
-
-    window.debugLog = function (msg) {
-        console.log(msg);
-        const line = document.createElement('div');
-        const time = new Date().toLocaleTimeString('ja-JP', { hour12: false });
-        line.textContent = `[${time}] ${msg}`;
-        box.appendChild(line);
-        box.scrollTop = box.scrollHeight;
-    };
-})();
-
 (async function initFirebaseSync() {
     const appId = typeof __app_id !== 'undefined' ? __app_id : window.APP_UNIQUE_ID;
     let db = null;
@@ -33,7 +8,6 @@
     window.firestoreReady = new Promise((resolve) => { firestoreReadyResolve = resolve; });
 
     if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-        window.debugLog && window.debugLog('__firebase_config あり → Firebase初期化開始');
         try {
             const { initializeApp } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js');
             const { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js');
@@ -51,7 +25,6 @@
                 collection, doc, addDoc, setDoc, getDoc, getDocs,
                 deleteDoc, onSnapshot, query, orderBy, serverTimestamp
             };
-            window.debugLog && window.debugLog('Firebase app/auth/db 初期化OK');
 
             const initAuth = async () => {
                 try {
@@ -60,13 +33,10 @@
                     } else {
                         await signInAnonymously(auth);
                     }
-                    window.debugLog && window.debugLog('匿名/カスタム認証 成功 uid=' + (auth.currentUser && auth.currentUser.uid));
                 } catch (err) {
                     console.error('Firebase認証エラー:', err);
-                    window.debugLog && window.debugLog('❌ Firebase認証エラー: ' + err.message);
                 } finally {
                     firestoreReadyResolve();
-                    window.debugLog && window.debugLog('firestoreReady resolve 完了');
                 }
             };
             initAuth();
@@ -79,11 +49,9 @@
             });
         } catch (e) {
             console.error('Firebase初期化エラー:', e);
-            window.debugLog && window.debugLog('❌ Firebase初期化エラー: ' + e.message);
             firestoreReadyResolve();
         }
     } else {
-        window.debugLog && window.debugLog('⚠️ __firebase_config が未定義。config.jsを確認してください');
         firestoreReadyResolve();
     }
 
@@ -1099,11 +1067,8 @@
         }
 
         async function initVideosFromFirestore() {
-            window.debugLog && window.debugLog('initVideosFromFirestore 開始。firestoreReady 待機中...');
             await window.firestoreReady;
-            window.debugLog && window.debugLog('firestoreReady 完了。window.db=' + !!window.db + ' firestoreFns=' + !!window.firestoreFns);
             if (!window.db || !window.firestoreFns) {
-                window.debugLog && window.debugLog('⚠️ db/firestoreFns が無いためconfig.jsの静的データにフォールバックします');
                 if (Array.isArray(videosData) && videosData.length > 0) {
                     videos = videosData.slice();
                     renderPlaylist();
@@ -1114,26 +1079,21 @@
             const { query, orderBy, onSnapshot, getDocs, addDoc, serverTimestamp } = window.firestoreFns;
             const videosRef = getVideosCollectionRef();
             const q = query(videosRef, orderBy('id', 'asc'));
-            window.debugLog && window.debugLog('購読先: sites/' + window.APP_UNIQUE_ID + '/videos');
 
             try {
                 const snapshot = await getDocs(q);
-                window.debugLog && window.debugLog('初回getDocs件数: ' + snapshot.size);
                 if (snapshot.empty && Array.isArray(videosData) && videosData.length > 0) {
-                    window.debugLog && window.debugLog('空なのでvideosDataから移行します(' + videosData.length + '件)');
                     for (const v of videosData) {
                         await addDoc(videosRef, { ...v, createdAt: serverTimestamp() });
                     }
                 }
             } catch (err) {
                 console.error('Firestore初期移行エラー:', err);
-                window.debugLog && window.debugLog('❌ 初期移行/getDocsエラー: ' + err.message);
             }
 
             onSnapshot(q, (snap) => {
                 const docs = [];
                 snap.forEach(d => docs.push({ ...d.data(), _docId: d.id }));
-                window.debugLog && window.debugLog('onSnapshot発火 件数=' + docs.length + ' id一覧=[' + docs.map(d => d.id).join(',') + ']');
                 if (docs.length > 0) {
                     videos = docs;
                     renderPlaylist();
@@ -1141,7 +1101,6 @@
                 }
             }, (err) => {
                 console.error('Firestore購読エラー:', err);
-                window.debugLog && window.debugLog('❌ onSnapshotエラー: ' + err.message);
             });
         }
 
@@ -1247,17 +1206,14 @@
                 appConfig.autoPlay = originalAutoPlay;
             };
 
-            window.debugLog && window.debugLog('forceLoadIdOneUntilReady 開始 activeId=' + activeId);
 
             // 届くまでは無期限に試行し続ける
             const timer = setInterval(() => {
                 const found = videos.some(v => v.id === activeId);
-                window.debugLog && window.debugLog('試行tick videos件数=' + videos.length + ' activeId一致=' + found);
                 if (!found) return;
 
                 attemptLoad();
                 hasLoadedInitialMedia = true;
-                window.debugLog && window.debugLog('✅ 読み込み成功 activeId=' + activeId);
                 clearInterval(timer);
 
                 // 届いた直後の0.1秒だけ、0.01秒間隔で念押しに再読み込みする
@@ -1380,10 +1336,8 @@
         function loadMedia(id) {
             const v = videos.find(item => item.id === id);
             if (!v) {
-                window.debugLog && window.debugLog('loadMedia(' + id + ') 失敗: videosの中に見つからない(件数=' + videos.length + ')');
                 return;
             }
-            window.debugLog && window.debugLog('loadMedia(' + id + ') 実行: title=' + v.title + ' type=' + v.type + ' url=' + (v.url || '(images)'));
             activeId = id;
             
             vTitle.textContent = v.title;
