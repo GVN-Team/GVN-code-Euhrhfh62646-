@@ -1089,7 +1089,9 @@
             lucide.createIcons();
         }
 
-        let videos = Array.isArray(videosData) ? videosData.slice() : [];
+        // Firestoreの本物のデータが届くまでは空のまま。
+        // config.jsのvideosDataは、Firebaseが使えない時だけの最終フォールバックとして扱う。
+        let videos = [];
 
         function getVideosCollectionRef() {
             if (!window.db || !window.firestoreFns) return null;
@@ -1101,7 +1103,11 @@
             await window.firestoreReady;
             window.debugLog && window.debugLog('firestoreReady 完了。window.db=' + !!window.db + ' firestoreFns=' + !!window.firestoreFns);
             if (!window.db || !window.firestoreFns) {
-                window.debugLog && window.debugLog('⚠️ db/firestoreFns が無いため中断(config.js静的データのまま)');
+                window.debugLog && window.debugLog('⚠️ db/firestoreFns が無いためconfig.jsの静的データにフォールバックします');
+                if (Array.isArray(videosData) && videosData.length > 0) {
+                    videos = videosData.slice();
+                    renderPlaylist();
+                }
                 return;
             }
 
@@ -1267,7 +1273,9 @@
         function initPlayer() {
             const params = new URLSearchParams(window.location.search);
             const vParam = parseInt(params.get('v'));
-            if (vParam && videos.find(v => v.id === vParam)) { activeId = vParam; } else { activeId = 1; }
+            // この時点ではvideosがまだ空(Firestore読み込み前)のことがあるので、
+            // 存在チェックはせず数値として有効なら採用する。実際に存在するかはforceLoadIdOneUntilReady側で判定される。
+            activeId = (Number.isInteger(vParam) && vParam > 0) ? vParam : 1;
 
             forceLoadIdOneUntilReady();
 
