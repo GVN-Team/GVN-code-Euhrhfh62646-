@@ -680,28 +680,31 @@
                 await new Promise(r => setTimeout(r, 400));
             }
 
-            let targetDB = dummyLocalDB;
             try {
-                const remoteRes = await fetch("https://github.com/Minecraft-jp/------/raw/refs/heads/main/-", { mode: 'cors' });
-                if (remoteRes.ok) {
-                    const remoteData = await remoteRes.json();
-                    if (Array.isArray(remoteData)) targetDB = remoteData;
+                const res = await fetch(AUTH_SERVER_URL + '/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        siteId: window.APP_UNIQUE_ID,
+                        username: userInp.value,
+                        password: passInp.value
+                    })
+                });
+                const data = await res.json();
+                clearInterval(dotInterval);
+
+                if (data.success) {
+                    setStoredData('session_user', data.username);
+                    setStoredData('session_avatar', "");
+                    applyLoginState(data.username, "");
+                } else {
+                    userInp.value = ""; passInp.value = "";
+                    displayLoginError('認証に失敗しました');
                 }
-            } catch (e) {
-                targetDB = dummyLocalDB;
-            }
-
-            clearInterval(dotInterval);
-
-            const foundUser = targetDB.find(u => u.username === userInp.value && u.password === passInp.value);
-
-            if (foundUser) {
-                setStoredData('session_user', foundUser.username);
-                setStoredData('session_avatar', "");
-                applyLoginState(foundUser.username, "");
-            } else {
+            } catch (err) {
+                clearInterval(dotInterval);
                 userInp.value = ""; passInp.value = "";
-                displayLoginError('認証に失敗しました');
+                displayLoginError('サーバーに接続できませんでした');
             }
         }
 
