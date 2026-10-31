@@ -1,3 +1,12 @@
+window.__firebase_config = JSON.stringify({
+    apiKey: "AIzaSyCMct_8D2DIqRifQIOsapJxRZah53o5RVs",
+    authDomain: "gvn-org-cloud.firebaseapp.com",
+    projectId: "gvn-org-cloud",
+    storageBucket: "gvn-org-cloud.firebasestorage.app",
+    messagingSenderId: "775860589726",
+    appId: "1:775860589726:web:c18f9bc5765d9b1f87978f"
+});
+
 (async function initFirebaseSync() {
     const appId = typeof __app_id !== 'undefined' ? __app_id : window.APP_UNIQUE_ID;
     let db = null;
@@ -1072,7 +1081,7 @@
         async function initVideosFromFirestore() {
             await window.firestoreReady;
             if (!window.db || !window.firestoreFns) {
-                if (Array.isArray(videosData) && videosData.length > 0) {
+                if (typeof videosData !== 'undefined' && Array.isArray(videosData) && videosData.length > 0) {
                     videos = videosData.slice();
                     renderPlaylist();
                 }
@@ -1085,7 +1094,7 @@
 
             try {
                 const snapshot = await getDocs(q);
-                if (snapshot.empty && Array.isArray(videosData) && videosData.length > 0) {
+                if (snapshot.empty && typeof videosData !== 'undefined' && Array.isArray(videosData) && videosData.length > 0) {
                     for (const v of videosData) {
                         await addDoc(videosRef, { ...v, createdAt: serverTimestamp() });
                     }
@@ -1108,7 +1117,7 @@
         }
 
         function isAdmin() {
-            return Array.isArray(ADMIN_DISCORD_IDS) && !!currentUserDiscordId && ADMIN_DISCORD_IDS.includes(currentUserDiscordId);
+            return typeof ADMIN_DISCORD_IDS !== 'undefined' && Array.isArray(ADMIN_DISCORD_IDS) && !!currentUserDiscordId && ADMIN_DISCORD_IDS.includes(currentUserDiscordId);
         }
 
         const ADMIN_URL_HASH = '#qz8f2mx91kd';
