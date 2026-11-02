@@ -21,14 +21,18 @@ window.__firebase_config = JSON.stringify({
             const { initializeApp } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js');
             const { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js');
             const {
-                getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs,
+                getFirestore, initializeFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs,
                 deleteDoc, onSnapshot, query, orderBy, serverTimestamp
             } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
 
             const firebaseConfig = JSON.parse(__firebase_config);
             const app = initializeApp(firebaseConfig);
             auth = getAuth(app);
-            db = getFirestore(app);
+            try {
+                db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
+            } catch (e) {
+                db = getFirestore(app);
+            }
 
             window.firestoreFns = {
                 collection, doc, addDoc, setDoc, getDoc, getDocs,
@@ -620,6 +624,7 @@ window.__firebase_config = JSON.stringify({
                     setStoredData('session_avatar', avatarUrl);
                     setStoredData('session_token', token);
                     setStoredData('session_discord_id', userData.id || '');
+                    setStoredData('session_token_checked_at', Date.now());
                     applyLoginState(discordUsername, avatarUrl, userData.id || '');
                 } else {
                     displayLoginError(`ロールを所持していません<br><a href="${DISCORD_CONFIG["invite-url"]}" target="_blank" class="underline font-bold text-amber-400">${DISCORD_CONFIG["invite-url"]}</a> でロールを購入してください`);
@@ -649,11 +654,6 @@ window.__firebase_config = JSON.stringify({
             window.addEventListener('hashchange', updateAddVideoButtonVisibility);
         }
 
-        if (document.readyState === 'complete') {
-            initApp();
-        } else {
-            window.addEventListener('load', initApp);
-        }
 
         const loaderMessages = [
             "サーバーとのセキュア接続を確立中",
@@ -837,6 +837,22 @@ window.__firebase_config = JSON.stringify({
         }
 
         function logout(silent) {
+            // 1) 先に画面を切り替える(以降の処理で何かが失敗しても即ログイン画面になる)
+            try {
+                const mc = document.getElementById('mainContent');
+                mc.classList.add('hidden'); mc.classList.remove('flex');
+                const ls = document.getElementById('loginScreen');
+                ls.classList.remove('hidden'); ls.classList.add('flex');
+                document.getElementById('userMenuDropdown').classList.add('hidden');
+                document.getElementById('loadingArea').classList.add('hidden');
+                document.getElementById('loadingArea').classList.remove('flex');
+                document.getElementById('loginBtnContainer').classList.remove('hidden');
+                document.getElementById('loginError').classList.add('hidden');
+                document.getElementById('userId').value = "";
+                document.getElementById('userPwd').value = "";
+            } catch (e) {}
+
+            // 2) セッション削除
             try {
                 localStorage.removeItem(STORAGE_PREFIX + 'session_user');
                 localStorage.removeItem(STORAGE_PREFIX + 'session_avatar');
@@ -854,30 +870,28 @@ window.__firebase_config = JSON.stringify({
             userWatchLater = [];
             userResumeTimes = {};
 
-            closeUserMenu();
-            if (player) {
-                player.pause();
-                player.src = "";
-            }
-            
-            const userMenuBtn = document.getElementById('userMenuBtn');
-            if (userMenuBtn) {
-                userMenuBtn.innerHTML = `<i data-lucide="user" class="w-5 h-5 sm:w-6 sm:h-6 pointer-events-none"></i>`;
-                lucide.createIcons();
-            }
+            // 3) 後始末(失敗しても無視)
+            try { clearInterval(dotInterval); } catch (e) {}
+            try { closeUserMenu(); } catch (e) {}
+            try { const rm = document.getElementById('resumeModal'); if (rm) rm.classList.add('hidden'); } catch (e) {}
+            try { unlockBodyScroll(); } catch (e) {}
+            try {
+                if (player) {
+                    player.pause();
+                    player.removeAttribute('src');
+                    if (playerSrc) playerSrc.removeAttribute('src');
+                    player.load();
+                }
+            } catch (e) {}
+            try {
+                const userMenuBtn = document.getElementById('userMenuBtn');
+                if (userMenuBtn) {
+                    userMenuBtn.innerHTML = `<i data-lucide="user" class="w-5 h-5 sm:w-6 sm:h-6 pointer-events-none"></i>`;
+                    lucide.createIcons();
+                }
+            } catch (e) {}
 
-            document.getElementById('mainContent').classList.add('hidden');
-            document.getElementById('mainContent').classList.remove('flex');
-            document.getElementById('loginScreen').classList.remove('hidden');
-            document.getElementById('loginScreen').classList.add('flex');
-            
-            document.getElementById('userId').value = "";
-            document.getElementById('userPwd').value = "";
-            document.getElementById('loadingArea').classList.add('hidden');
-            document.getElementById('loginBtnContainer').classList.remove('hidden');
-            document.getElementById('loginError').classList.add('hidden');
-            
-            if (silent !== true) showToast("ログアウトしました", "account");
+            if (silent !== true) { try { showToast("ログアウトしました", "account"); } catch (e) {} }
         }
 
         document.addEventListener('click', (e) => {
@@ -1102,29 +1116,110 @@ window.__firebase_config = JSON.stringify({
             return window.firestoreFns.collection(window.db, 'sites', window.APP_UNIQUE_ID, 'videos');
         }
 
+        function showVideoLoadStatus(msg) {
+            const pl = document.getElementById('playlist');
+            if (!pl || videos.length > 0) return;
+            pl.innerHTML = '<div class="p-4 text-center text-xs text-brandMuted leading-relaxed">' + msg +
+                '<br><button onclick="retryLoadVideos()" class="mt-3 px-4 py-2 rounded-full border border-brandBorder text-brandAccent font-bold">再取得</button></div>';
+        }
+
+        // SDKが固まる環境(iPhone Safari等)向け: 公開読み取りのREST APIで直接取得する
+        async function loadVideosViaRest() {
+            const unwrap = (v) => {
+                if (v == null) return null;
+                if ('stringValue' in v) return v.stringValue;
+                if ('integerValue' in v) return parseInt(v.integerValue, 10);
+                if ('doubleValue' in v) return v.doubleValue;
+                if ('booleanValue' in v) return v.booleanValue;
+                if ('timestampValue' in v) return v.timestampValue;
+                if ('mapValue' in v) { const o = {}; const f = (v.mapValue && v.mapValue.fields) || {}; for (const k in f) o[k] = unwrap(f[k]); return o; }
+                if ('arrayValue' in v) return ((v.arrayValue && v.arrayValue.values) || []).map(unwrap);
+                return null;
+            };
+            const base = 'https://firestore.googleapis.com/v1/projects/gvn-org-cloud/databases/(default)/documents/sites/' +
+                encodeURIComponent(window.APP_UNIQUE_ID) + '/videos';
+            const out = [];
+            let pageToken = '';
+            do {
+                const ctrl = new AbortController();
+                const t = setTimeout(() => ctrl.abort(), 15000);
+                const res = await fetch(base + '?pageSize=300' + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : ''), { signal: ctrl.signal });
+                clearTimeout(t);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const json = await res.json();
+                (json.documents || []).forEach(d => {
+                    const o = {}; const f = d.fields || {};
+                    for (const k in f) o[k] = unwrap(f[k]);
+                    o._docId = d.name.split('/').pop();
+                    out.push(o);
+                });
+                pageToken = json.nextPageToken || '';
+            } while (pageToken);
+            out.sort((a, b) => (a.id || 0) - (b.id || 0));
+            return out;
+        }
+
+        let videoRestRunning = false;
+        async function fallbackLoadVideos() {
+            if (videos.length > 0 || videoRestRunning) return;
+            videoRestRunning = true;
+            try {
+                const docs = await loadVideosViaRest();
+                if (docs.length > 0 && videos.length === 0) {
+                    videos = docs;
+                    renderPlaylist();
+                } else if (docs.length === 0 && videos.length === 0) {
+                    showVideoLoadStatus('動画が見つかりませんでした(このサイトIDの動画が未登録の可能性があります)');
+                }
+            } catch (err) {
+                showVideoLoadStatus('動画を取得できませんでした(' + (err && err.message ? err.message : '通信エラー') + ')');
+            }
+            videoRestRunning = false;
+        }
+
+        function retryLoadVideos() {
+            videoRestRunning = false;
+            fallbackLoadVideos();
+            initVideosFromFirestore();
+        }
+
+        let videosSubscribed = false;
         async function initVideosFromFirestore() {
-            await window.firestoreReady;
-            if (!window.db || !window.firestoreFns) {
-                if (typeof videosData !== 'undefined' && Array.isArray(videosData) && videosData.length > 0) {
+            // 5秒たっても動画が届かなければRESTで取得する(SDKの待ちとは並行して動く)
+            setTimeout(() => { if (videos.length === 0) fallbackLoadVideos(); }, 5000);
+
+            const readyOrTimeout = await Promise.race([
+                window.firestoreReady.then(() => true),
+                new Promise(r => setTimeout(() => r(false), 8000))
+            ]);
+            if (!readyOrTimeout || !window.db || !window.firestoreFns) {
+                if (typeof videosData !== 'undefined' && Array.isArray(videosData) && videosData.length > 0 && videos.length === 0) {
                     videos = videosData.slice();
                     renderPlaylist();
                 }
+                fallbackLoadVideos();
                 return;
             }
+            if (videosSubscribed) return;
+            videosSubscribed = true;
 
             const { query, orderBy, onSnapshot, getDocs, addDoc, serverTimestamp } = window.firestoreFns;
             const videosRef = getVideosCollectionRef();
             const q = query(videosRef, orderBy('id', 'asc'));
 
             try {
-                const snapshot = await getDocs(q);
+                const snapshot = await Promise.race([
+                    getDocs(q),
+                    new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000))
+                ]);
                 if (snapshot.empty && typeof videosData !== 'undefined' && Array.isArray(videosData) && videosData.length > 0) {
                     for (const v of videosData) {
                         await addDoc(videosRef, { ...v, createdAt: serverTimestamp() });
                     }
                 }
             } catch (err) {
-                console.error('Firestore初期移行エラー:', err);
+                console.error('Firestore初期取得エラー:', err);
+                fallbackLoadVideos();
             }
 
             onSnapshot(q, (snap) => {
@@ -1133,10 +1228,11 @@ window.__firebase_config = JSON.stringify({
                 if (docs.length > 0) {
                     videos = docs;
                     renderPlaylist();
-                    // 初回表示の確実な読み込みは forceLoadIdOneUntilReady 側の連続試行に任せる
                 }
             }, (err) => {
                 console.error('Firestore購読エラー:', err);
+                videosSubscribed = false;
+                fallbackLoadVideos();
             });
         }
 
@@ -2037,3 +2133,10 @@ window.__firebase_config = JSON.stringify({
                 toast.classList.remove('translate-y-0', 'opacity-100');
             }, 2500);
         }
+
+// すべての変数・関数の定義が終わってから初期化する(config.jsが後から読み込むため、load済みの場合は即実行)
+if (document.readyState === 'complete') {
+    initApp();
+} else {
+    window.addEventListener('load', initApp);
+}
