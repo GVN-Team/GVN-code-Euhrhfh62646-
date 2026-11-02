@@ -530,6 +530,10 @@ window.__firebase_config = JSON.stringify({
         }
 
         function loginWithDiscord() {
+            if (!DISCORD_CONFIG["verify-url"] || !DISCORD_CONFIG["client-id"]) {
+                displayLoginError('Discordの設定が読み込まれていません(discord-config-adminで保存してください)');
+                return;
+            }
             window.location.href = DISCORD_CONFIG["verify-url"];
         }
 
@@ -625,7 +629,7 @@ window.__firebase_config = JSON.stringify({
             }
         }
 
-        window.onload = function() {
+        function initApp() {
             lucide.createIcons();
             applyStartupConfig();
             
@@ -643,7 +647,13 @@ window.__firebase_config = JSON.stringify({
             setupAutoFadeControls();
             setupImageSwipeEvents();
             window.addEventListener('hashchange', updateAddVideoButtonVisibility);
-        };
+        }
+
+        if (document.readyState === 'complete') {
+            initApp();
+        } else {
+            window.addEventListener('load', initApp);
+        }
 
         const loaderMessages = [
             "サーバーとのセキュア接続を確立中",
@@ -689,31 +699,45 @@ window.__firebase_config = JSON.stringify({
                 await new Promise(r => setTimeout(r, 400));
             }
 
+            const authBase = String(AUTH_SERVER_URL || '').trim().replace(/\/+$/, '');
+            if (!authBase) {
+                clearInterval(dotInterval);
+                displayLoginError('認証サーバーのURLが設定されていません(auth-server-url-adminで保存してください)');
+                return;
+            }
+
             try {
-                const res = await fetch(AUTH_SERVER_URL + '/login', {
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), 60000);
+                const res = await fetch(authBase + '/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         siteId: window.APP_UNIQUE_ID,
                         username: userInp.value,
                         password: passInp.value
-                    })
+                    }),
+                    signal: controller.signal
                 });
-                const data = await res.json();
+                clearTimeout(timer);
+                let data = null;
+                try { data = await res.json(); } catch (e) { data = null; }
                 clearInterval(dotInterval);
 
-                if (data.success) {
+                if (data && data.success) {
                     setStoredData('session_user', data.username);
                     setStoredData('session_avatar', "");
                     applyLoginState(data.username, "");
-                } else {
+                } else if (data) {
                     userInp.value = ""; passInp.value = "";
-                    displayLoginError('認証に失敗しました');
+                    displayLoginError(res.status === 429 ? '試行回数が多すぎます。1分ほど待ってからもう一度お試しください' : '認証に失敗しました');
+                } else {
+                    displayLoginError('サーバーの応答が不正です(HTTP ' + res.status + ')。認証サーバーのURLを確認してください');
                 }
             } catch (err) {
                 clearInterval(dotInterval);
                 userInp.value = ""; passInp.value = "";
-                displayLoginError('サーバーに接続できませんでした');
+                displayLoginError('サーバーに接続できませんでした(サーバー停止中、またはALLOWED_ORIGINSにこのサイトのURLが無い可能性があります)');
             }
         }
 
