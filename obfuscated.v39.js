@@ -73,7 +73,6 @@ const APP_LAYOUT_HTML = String.raw`
                     <div id="userMenuDropdown" class="hidden absolute right-0 top-full mt-3 w-48 bg-brandSurface border border-brandBorder rounded-xl shadow-2xl py-2 z-50 origin-top-right">
                         <a href="javascript:void(0)" onclick="closeUserMenu(); openMyPage();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="layout-dashboard" class="w-4 h-4 text-brandMuted"></i> マイページ</a>
                         <a href="javascript:void(0)" onclick="closeUserMenu(); openHistoryModal();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="history" class="w-4 h-4 text-brandMuted"></i> 視聴履歴</a>
-                        <a href="javascript:void(0)" onclick="closeUserMenu(); openWatchLaterModal();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="bookmark" class="w-4 h-4 text-brandMuted"></i> あとで見る</a>
                         <a href="javascript:void(0)" onclick="closeUserMenu(); openFavoritesModal();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="heart" class="w-4 h-4 text-brandMuted"></i> お気に入り</a>
                         <a href="javascript:void(0)" onclick="closeUserMenu(); openSavesModal();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="bookmark" class="w-4 h-4 text-brandMuted"></i> 保存した動画</a>
                         <a href="javascript:void(0)" onclick="closeUserMenu(); openNotificationSettingsModal();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="bell" class="w-4 h-4 text-brandMuted"></i> 通知設定</a>
@@ -189,9 +188,6 @@ const APP_LAYOUT_HTML = String.raw`
                             </button>
                             <button id="saveBtn" onclick="toggleSave()" title="保存(アカウントに永久保存)" class="p-3 bg-brandBg border border-brandBorder hover:border-brandAccent active:scale-95 transition-all rounded-full text-brandText shadow-md flex items-center justify-center min-w-[44px] min-h-[44px]">
                                 <i data-lucide="bookmark" class="w-5 h-5 text-brandAccent fill-transparent"></i>
-                            </button>
-                            <button id="watchLaterBtn" onclick="toggleWatchLater()" title="あとで見る" class="p-3 bg-brandBg border border-brandBorder hover:border-amber-400 active:scale-95 transition-all rounded-full text-brandText shadow-md flex items-center justify-center min-w-[44px] min-h-[44px]">
-                                <i data-lucide="bookmark" id="watchLaterIcon" class="w-5 h-5 text-amber-400 fill-transparent"></i>
                             </button>
                             <button onclick="shareVideo()" class="flex items-center gap-1.5 px-4 py-3 bg-brandBg border border-brandBorder hover:border-brandAccent active:scale-95 transition-all rounded-full text-xs font-bold text-brandText shadow-md min-h-[44px]">
                                 <i data-lucide="share-2" class="w-4 h-4 text-blue-400"></i><span>共有する</span>
@@ -533,9 +529,9 @@ const APP_LAYOUT_HTML = String.raw`
                     </label>
                 </div>
 
-                <div class="notif-item flex items-center justify-between p-3 bg-brandBg rounded-xl border border-brandBorder" data-title="「あとで見る」追加・削除" data-desc="リスト追加、削除操作の完了通知">
+                <div class="notif-item flex items-center justify-between p-3 bg-brandBg rounded-xl border border-brandBorder" data-title="「お気に入り・保存」追加・削除" data-desc="リスト追加、削除操作の完了通知">
                     <div>
-                        <p class="text-xs font-bold text-brandText">「あとで見る」追加・削除</p>
+                        <p class="text-xs font-bold text-brandText">「お気に入り・保存」追加・削除</p>
                         <p class="text-[10px] text-brandMuted">リスト追加、削除操作の完了通知</p>
                     </div>
                     <label class="flex items-center cursor-pointer">
@@ -713,19 +709,6 @@ const APP_LAYOUT_HTML = String.raw`
             <div class="pt-3 border-t border-brandBorder flex gap-2 flex-shrink-0">
                 <button onclick="clearHistory()" class="w-1/2 py-3 bg-red-950/40 border border-red-900/60 hover:bg-red-900/60 text-red-400 rounded-xl text-xs font-bold transition-all min-h-[44px]">履歴を消去</button>
                 <button onclick="closeHistoryModal()" class="w-1/2 py-3 bg-brandBg border border-brandBorder hover:border-brandAccent text-brandText rounded-xl text-xs font-bold transition-all min-h-[44px]">閉じる</button>
-            </div>
-        </div>
-    </div>
-
-        <div id="watchLaterModal" class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 hidden">
-        <div class="bg-brandSurface border border-brandBorder rounded-theme max-w-md w-full max-h-[85vh] flex flex-col p-6 shadow-2xl">
-            <div class="flex justify-between items-center pb-3 border-b border-brandBorder flex-shrink-0">
-                <h3 class="text-lg font-bold text-brandText flex items-center gap-2"><i data-lucide="bookmark" class="text-amber-400"></i><span>あとで見る</span></h3>
-                <button onclick="closeWatchLaterModal()" class="text-brandMuted hover:text-brandText transition-colors p-2"><i data-lucide="x" class="w-5 h-5"></i></button>
-            </div>
-            <div id="watchLaterListContainer" class="overflow-y-auto flex-grow py-4 space-y-3 scrollbar-thin"></div>
-            <div class="pt-3 border-t border-brandBorder flex-shrink-0">
-                <button onclick="closeWatchLaterModal()" class="w-full py-3 bg-brandBg border border-brandBorder hover:border-brandAccent text-brandText rounded-xl text-xs font-bold transition-all min-h-[44px]">閉じる</button>
             </div>
         </div>
     </div>
@@ -1247,7 +1230,7 @@ window.__firebase_config = JSON.stringify({
         function buildMyPageHTML() {
             const uniqueWatchedIds = [...new Set(userWatchHistory.map(h => h.id))];
             const watchedCount = uniqueWatchedIds.length;
-            const watchLaterCount = userWatchLater.length;
+            const savedCount = userSaved.length;
             const totalCount = videos.length;
             const recent = userWatchHistory.slice(0, 6)
                 .map(h => videos.find(v => v.id === h.id))
@@ -1294,8 +1277,8 @@ window.__firebase_config = JSON.stringify({
                                 <p class="text-[10px] sm:text-xs text-brandMuted font-bold mt-1">視聴済み</p>
                             </div>
                             <div class="bg-brandSurface border border-brandBorder rounded-xl p-4 text-center">
-                                <p class="text-2xl sm:text-3xl font-black text-brandAccent">${watchLaterCount}</p>
-                                <p class="text-[10px] sm:text-xs text-brandMuted font-bold mt-1">あとで見る</p>
+                                <p class="text-2xl sm:text-3xl font-black text-brandAccent">${savedCount}</p>
+                                <p class="text-[10px] sm:text-xs text-brandMuted font-bold mt-1">保存</p>
                             </div>
                             <div class="bg-brandSurface border border-brandBorder rounded-xl p-4 text-center">
                                 <p class="text-2xl sm:text-3xl font-black text-brandAccent">${totalCount}</p>
@@ -1311,7 +1294,7 @@ window.__firebase_config = JSON.stringify({
                         <h3 class="text-xs font-bold text-brandMuted mb-3 flex items-center gap-1.5"><i data-lucide="zap" class="w-3.5 h-3.5"></i> クイックアクション</h3>
                         <div class="grid grid-cols-2 gap-2.5 mb-2">
                             <button onclick="closeMyPage(); openHistoryModal();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandSurface border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-3 transition"><i data-lucide="history" class="w-4 h-4 text-brandMuted"></i> 視聴履歴</button>
-                            <button onclick="closeMyPage(); openWatchLaterModal();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandSurface border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-3 transition"><i data-lucide="bookmark" class="w-4 h-4 text-brandMuted"></i> あとで見る</button>
+                            <button onclick="closeMyPage(); openSavesModal();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandSurface border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-3 transition"><i data-lucide="bookmark" class="w-4 h-4 text-brandMuted"></i> 保存した動画</button>
                             <button onclick="closeMyPage(); openSettings();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandSurface border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-3 transition"><i data-lucide="settings" class="w-4 h-4 text-brandMuted"></i> 設定</button>
                             <button onclick="closeMyPage(); openNotificationSettingsModal();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandSurface border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-3 transition"><i data-lucide="bell" class="w-4 h-4 text-brandMuted"></i> 通知設定</button>
                             <button onclick="closeMyPage(); showShortcutsModal();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandSurface border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-3 transition"><i data-lucide="keyboard" class="w-4 h-4 text-brandMuted"></i> ショートカット</button>
@@ -1354,7 +1337,7 @@ window.__firebase_config = JSON.stringify({
         }
 
         function resetAllSettingsAndData() {
-            if (!confirm("設定と保存データ(履歴・あとで見る・視聴位置・設定)をすべて初期化します。よろしいですか？")) return;
+            if (!confirm("設定と保存データ(履歴・お気に入り・視聴位置・設定。アカウントの保存は消えません)をすべて初期化します。よろしいですか？")) return;
             const keysToRemove = [];
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
@@ -1393,7 +1376,6 @@ window.__firebase_config = JSON.stringify({
         let currentUserAvatar = "";
         let currentUserDiscordId = "";
         let userWatchHistory = [];
-        let userWatchLater = [];
         let userFavorites = [];
         let userResumeTimes = {};
 
@@ -1634,7 +1616,6 @@ window.__firebase_config = JSON.stringify({
             currentUserDiscordId = discordId || getStoredData('session_discord_id', '');
             
             userWatchHistory = getStoredData('history_' + currentUser, []);
-            userWatchLater = getStoredData('watchlater_' + currentUser, []);
             userFavorites = getStoredData('favorites_' + currentUser, []);
             userResumeTimes = getStoredData('resumes_' + currentUser, {});
 
@@ -1678,15 +1659,12 @@ window.__firebase_config = JSON.stringify({
                 if (docSnap.exists()) {
                     const data = docSnap.data();
                     if (Array.isArray(data.history)) userWatchHistory = data.history;
-                    if (Array.isArray(data.watchLater)) userWatchLater = data.watchLater;
                     if (data.resumeTimes) userResumeTimes = data.resumeTimes;
                     
                     setStoredData('history_' + currentUser, userWatchHistory);
-                    setStoredData('watchlater_' + currentUser, userWatchLater);
                     setStoredData('favorites_' + currentUser, userFavorites);
                     setStoredData('resumes_' + currentUser, userResumeTimes);
 
-                    updateWatchLaterBtnUI();
                     updateFavoriteBtnUI();
                     renderPlaylist();
                 } else {
@@ -1698,7 +1676,6 @@ window.__firebase_config = JSON.stringify({
         async function saveUserDataToCloud() {
             if (!currentUser) return;
             setStoredData('history_' + currentUser, userWatchHistory);
-            setStoredData('watchlater_' + currentUser, userWatchLater);
             setStoredData('favorites_' + currentUser, userFavorites);
             setStoredData('resumes_' + currentUser, userResumeTimes);
 
@@ -1710,7 +1687,6 @@ window.__firebase_config = JSON.stringify({
                 await window.setDoc(docRef, {
                     username: currentUser,
                     history: userWatchHistory,
-                    watchLater: userWatchLater,
                     resumeTimes: userResumeTimes,
                     updatedAt: new Date().toISOString()
                 }, { merge: true });
@@ -1760,7 +1736,6 @@ window.__firebase_config = JSON.stringify({
             window.currentUser = null;
             window.currentUserDiscordId = null;
             userWatchHistory = [];
-            userWatchLater = [];
             userFavorites = [];
             userSaved = [];
             savesReady = false;
@@ -1861,80 +1836,6 @@ window.__firebase_config = JSON.stringify({
             saveUserDataToCloud();
             openHistoryModal();
             showToast("視聴履歴を消去しました", "historyClear");
-        }
-
-        function toggleWatchLater() {
-            if (!currentUser) return;
-            const index = userWatchLater.indexOf(activeId);
-            if (index >= 0) {
-                userWatchLater.splice(index, 1);
-                showToast("「あとで見る」から削除しました", "watchLater");
-            } else {
-                userWatchLater.push(activeId);
-                showToast("「あとで見る」に追加しました", "watchLater");
-            }
-            saveUserDataToCloud();
-            updateWatchLaterBtnUI();
-        }
-
-        function updateWatchLaterBtnUI() {
-            const isAdded = userWatchLater.includes(activeId);
-            const btn = document.getElementById('watchLaterBtn');
-            if (isAdded) {
-                btn.innerHTML = `<i data-lucide="bookmark" class="w-5 h-5 text-amber-400 fill-amber-400"></i>`;
-            } else {
-                btn.innerHTML = `<i data-lucide="bookmark" class="w-5 h-5 text-amber-400 fill-transparent"></i>`;
-            }
-            lucide.createIcons();
-        }
-
-        function openWatchLaterModal() {
-            const container = document.getElementById('watchLaterListContainer');
-            container.innerHTML = "";
-            if (userWatchLater.length === 0) {
-                container.innerHTML = `<p class="text-xs text-brandMuted text-center py-8">「あとで見る」リストは空です</p>`;
-            } else {
-                userWatchLater.forEach(id => {
-                    const v = videos.find(video => video.id === id);
-                    if (!v) return;
-                    const el = document.createElement('div');
-                    el.className = "flex items-center justify-between p-3 bg-brandBg rounded-xl border border-brandBorder";
-                    el.innerHTML = `
-                        <div class="flex items-center gap-3 min-w-0 cursor-pointer flex-grow" onclick="loadMedia(${v.id}); closeWatchLaterModal();">
-                            <img src="${v.thumbnail}" class="w-16 h-10 object-contain bg-black rounded border border-brandBorder flex-shrink-0">
-                            <div class="min-w-0">
-                                <p class="text-xs font-bold text-brandText truncate">${v.title}</p>
-                                <p class="text-[10px] text-brandMuted">${v.duration}</p>
-                            </div>
-                        </div>
-                        <button onclick="removeFromWatchLater(${v.id}, event)" class="p-2 text-brandMuted hover:text-red-500 transition-colors min-w-[40px] min-h-[40px] flex items-center justify-center" title="削除">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i>
-                        </button>
-                    `;
-                    container.appendChild(el);
-                });
-            }
-            document.getElementById('watchLaterModal').classList.remove('hidden');
-            lockBodyScroll();
-            lucide.createIcons();
-        }
-
-        function removeFromWatchLater(id, e) {
-            if (e) e.stopPropagation();
-            if (!currentUser) return;
-            const index = userWatchLater.indexOf(id);
-            if (index >= 0) {
-                userWatchLater.splice(index, 1);
-                saveUserDataToCloud();
-                openWatchLaterModal();
-                updateWatchLaterBtnUI();
-                showToast("リストから削除しました", "watchLater");
-            }
-        }
-
-        function closeWatchLaterModal() {
-            document.getElementById('watchLaterModal').classList.add('hidden');
-            unlockBodyScroll();
         }
 
         function toggleFavorite() {
@@ -2098,6 +1999,16 @@ window.__firebase_config = JSON.stringify({
                 if (currentUser !== user) return;
                 userSaved = list || [];
                 savesReady = true;
+                try {
+                    const legacy = getStoredData('watchlater_' + user, []);
+                    if (Array.isArray(legacy) && legacy.length > 0) {
+                        const merged = userSaved.slice();
+                        legacy.forEach(id => { if (Number.isInteger(id) && !merged.includes(id)) merged.push(id); });
+                        if (merged.length !== userSaved.length) await pushSavedToCloud(merged);
+                        userSaved = merged;
+                        localStorage.removeItem(STORAGE_PREFIX + 'watchlater_' + user);
+                    }
+                } catch (e) {}
             } catch (e) {
                 savesReady = false;
             }
@@ -2765,7 +2676,6 @@ window.__firebase_config = JSON.stringify({
             vDate.textContent = `公開日: ${v.date}`;
             vDesc.innerHTML = formatHashtags(v.desc);
             renderPlaylist();
-            updateWatchLaterBtnUI();
             updateFavoriteBtnUI();
             updateSaveBtnUI();
             if (appConfig.recordHistory) recordHistory(v.id);
