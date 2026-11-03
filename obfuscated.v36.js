@@ -1,3 +1,849 @@
+const APP_LAYOUT_HTML = String.raw`
+        <div id="loginScreen" class="min-h-screen flex items-center justify-center p-6 bg-brandBg flex-col z-50 relative">
+        <div class="w-full max-w-sm bg-brandSurface p-8 sm:p-10 rounded-theme border border-brandBorder theme-shadow relative overflow-hidden transition-all duration-300">
+            
+            <h2 class="text-5xl text-brandAccent mb-8 sm:mb-10 flex justify-center tracking-[0.1em]">
+                <span style="font-family: 'Bebas Neue', sans-serif; transform: scaleY(1.15); transform-origin: bottom;">LOGIN</span>
+            </h2>
+            
+            <form id="loginForm" onsubmit="event.preventDefault(); if (typeof handleLogin === 'function') { handleLogin(event); } else { document.getElementById('loginError').classList.remove('hidden'); document.getElementById('loginError').classList.add('flex'); document.getElementById('loginErrorMsg').textContent = '読み込み中です。数秒待ってからもう一度お試しください'; } return false;" class="space-y-6 sm:space-y-8">
+                <div class="relative">
+                    <input type="text" id="userId" required placeholder=" " class="floating-input w-full bg-transparent border-b border-brandBorder py-2.5 text-brandText focus:border-brandAccent outline-none transition-all text-base">
+                    <label class="floating-label absolute left-0 top-2.5 text-brandMuted pointer-events-none text-sm">Username</label>
+                </div>
+                <div class="relative">
+                    <input type="password" id="userPwd" required placeholder=" " class="floating-input w-full bg-transparent border-b border-brandBorder py-2.5 text-brandText focus:border-brandAccent outline-none transition-all text-base">
+                    <label class="floating-label absolute left-0 top-2.5 text-brandMuted pointer-events-none text-sm">Password</label>
+                </div>
+                
+                                <div class="pt-2 flex flex-col gap-3.5" id="loginBtnContainer">
+                    <button type="submit" class="w-full bg-brandAccent hover:bg-brandAccentHover text-white h-12 rounded-full font-bold transition-all shadow-lg uppercase tracking-widest text-sm active:scale-95 flex items-center justify-center">
+                        Sign in
+                    </button>
+
+                                        <button type="button" onclick="if (typeof loginWithDiscord === 'function') { loginWithDiscord(); } else { document.getElementById('loginError').classList.remove('hidden'); document.getElementById('loginError').classList.add('flex'); document.getElementById('loginErrorMsg').textContent = '読み込み中です。数秒待ってからもう一度お試しください'; }" class="w-full bg-[#5865F2] hover:bg-[#4752C4] text-white h-12 px-4 rounded-full font-bold transition-all shadow-lg flex items-center justify-center gap-2.5 text-sm active:scale-95">
+                        <svg class="w-5 h-5 fill-current flex-shrink-0" viewBox="0 0 127.14 96.36">
+                            <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,45.91,53.87,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,45.91,96.11,53,91.08,65.69,84.69,65.69Z"/>
+                        </svg>
+                        <span>Discordでログイン</span>
+                    </button>
+                </div>
+            </form>
+
+            <div id="loadingArea" class="hidden flex-col items-center justify-center mt-6 pt-4">
+                <div class="login-spinner rounded-full h-8 w-8 border-4 border-brandAccent border-t-transparent mb-4"></div>
+                                <div id="loadingTextContainer" class="flex items-center justify-center text-brandAccent text-xs font-bold tracking-wide font-mono h-6 text-center w-full">
+                    <span id="loadingMsg">サーバー状況を確認しています</span>
+                    <span id="loadingDots" class="w-4 text-left inline-block"></span>
+                </div>
+            </div>
+
+            <div id="loginError" class="hidden items-center justify-center gap-2 text-red-500 bg-red-950/30 border border-red-900 py-3 px-4 rounded-xl mt-6">
+                <i data-lucide="alert-circle" class="w-5 h-5 flex-shrink-0"></i>
+                <span id="loginErrorMsg" class="text-xs font-bold tracking-normal leading-relaxed break-all">認証に失敗しました</span>
+            </div>
+        </div>
+    </div>
+
+        <div id="mainContent" class="hidden flex-col w-full min-h-screen">
+        
+        <header id="mainHeader" class="w-full bg-brandHeader border-b border-brandBorder py-3 px-3 sm:px-6 md:px-10 flex items-center justify-between gap-3 shadow-md z-40 transition-all duration-500 select-none">
+            
+            <div class="flex items-center flex-shrink-0">
+                <button onclick="openSettings()" class="p-2.5 text-brandMuted hover:text-brandAccent hover:bg-brandSurface rounded-full transition-all active:scale-90 min-w-[44px] min-h-[44px] flex items-center justify-center" title="UI・プレイヤー設定">
+                    <i data-lucide="settings" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 min-w-0 overflow-x-auto no-scrollbar py-1" id="externalLinksContainer">
+                <div class="flex items-center gap-2.5" id="linksList"></div>
+            </div>
+            
+            <div class="flex items-center gap-3 flex-shrink-0">
+                <div class="text-right hidden sm:block">
+                    <p class="text-[10px] text-brandMuted">Welcome,</p>
+                    <p id="headerUsername" class="text-xs font-bold text-brandAccent tracking-wide">User</p>
+                </div>
+
+                                <div class="relative">
+                    <div id="userMenuBtn" onclick="toggleUserMenu(event)" class="cursor-pointer w-10 h-10 rounded-full bg-brandSurface border border-brandBorder flex items-center justify-center text-brandMuted shadow-inner overflow-hidden hover:border-brandAccent transition-colors">
+                        <i data-lucide="user" class="w-5 h-5 sm:w-6 sm:h-6 pointer-events-none"></i>
+                    </div>
+                    
+                    <div id="userMenuDropdown" class="hidden absolute right-0 top-full mt-3 w-48 bg-brandSurface border border-brandBorder rounded-xl shadow-2xl py-2 z-50 origin-top-right">
+                        <a href="javascript:void(0)" onclick="closeUserMenu(); openMyPage();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="layout-dashboard" class="w-4 h-4 text-brandMuted"></i> マイページ</a>
+                        <a href="javascript:void(0)" onclick="closeUserMenu(); openHistoryModal();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="history" class="w-4 h-4 text-brandMuted"></i> 視聴履歴</a>
+                        <a href="javascript:void(0)" onclick="closeUserMenu(); openWatchLaterModal();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="bookmark" class="w-4 h-4 text-brandMuted"></i> あとで見る</a>
+                        <a href="javascript:void(0)" onclick="closeUserMenu(); openFavoritesModal();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="heart" class="w-4 h-4 text-brandMuted"></i> お気に入り</a>
+                        <a href="javascript:void(0)" onclick="closeUserMenu(); openNotificationSettingsModal();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="bell" class="w-4 h-4 text-brandMuted"></i> 通知設定</a>
+                        <a href="javascript:void(0)" onclick="closeUserMenu(); showShortcutsModal();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="keyboard" class="w-4 h-4 text-brandMuted"></i> ショートカット</a>
+                        
+                        <hr class="border-brandBorder my-2 opacity-50">
+                        
+                        <button onclick="logout()" class="w-full text-left px-4 py-3 text-xs font-bold text-red-500 hover:bg-red-950/30 transition-colors flex items-center gap-2.5"><i data-lucide="log-out" class="w-4 h-4"></i> ログアウト</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+                <div id="mainLayoutGrid" class="max-w-6xl w-full mx-auto p-3 sm:p-6 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 flex-grow mt-2 sm:mt-4 transition-all duration-300">
+            
+                        <div id="playerColumn" class="lg:col-span-2 space-y-5 sm:space-y-6 transition-all duration-300">
+                <div id="videoContainer" class="relative w-full aspect-video bg-black rounded-theme overflow-hidden shadow-2xl border border-brandBorder group transition-all duration-300">
+                    
+                                        <video id="mainPlayer" class="w-full h-full object-contain" playsinline>
+                        <source id="playerSource" src="" type="video/mp4">
+                    </video>
+
+                                        <div id="imageViewer" class="absolute inset-0 z-[25] hidden bg-black flex-col overflow-hidden">
+                                                <div id="imageTrack" class="flex w-full h-full transition-transform duration-300 ease-out touch-pan-y">
+                                                    </div>
+                        
+                                                <button id="prevImgBtn" onclick="prevImage(event)" class="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-2 sm:p-3 bg-black/60 hover:bg-black/80 text-white rounded-full transition-all opacity-0 group-hover:opacity-100 disabled:opacity-0 z-30 shadow-lg">
+                            <i data-lucide="chevron-left" class="w-5 h-5 sm:w-6 sm:h-6"></i>
+                        </button>
+                        <button id="nextImgBtn" onclick="nextImage(event)" class="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-2 sm:p-3 bg-black/60 hover:bg-black/80 text-white rounded-full transition-all opacity-0 group-hover:opacity-100 disabled:opacity-0 z-30 shadow-lg">
+                            <i data-lucide="chevron-right" class="w-5 h-5 sm:w-6 sm:h-6"></i>
+                        </button>
+                        
+                                                <div id="imageIndicators" class="absolute bottom-4 left-0 right-0 flex justify-center gap-2 z-30"></div>
+                        
+                                                <div class="absolute top-4 right-4 bg-black/60 backdrop-blur text-white text-xs font-mono px-3 py-1.5 rounded-full z-30 shadow-lg border border-white/10">
+                            <span id="currentImgNum">1</span> / <span id="totalImgNum">1</span>
+                        </div>
+                    </div>
+
+                                        <div id="touchGestureOverlay" class="absolute inset-0 z-20 flex pointer-events-auto">
+                        <div id="leftTapZone" class="w-1/2 h-full relative flex items-center justify-center">
+                            <div id="leftRipple" class="hidden flex-col items-center justify-center bg-white/20 rounded-full w-24 h-24 p-2 text-white double-tap-ripple pointer-events-none">
+                                <i data-lucide="rotate-ccw" class="w-8 h-8"></i>
+                                <span id="leftRippleText" class="text-[11px] font-bold mt-1">10秒戻る</span>
+                            </div>
+                        </div>
+                        <div id="rightTapZone" class="w-1/2 h-full relative flex items-center justify-center">
+                            <div id="rightRipple" class="hidden flex-col items-center justify-center bg-white/20 rounded-full w-24 h-24 p-2 text-white double-tap-ripple pointer-events-none">
+                                <i data-lucide="rotate-cw" class="w-8 h-8"></i>
+                                <span id="rightRippleText" class="text-[11px] font-bold mt-1">10秒進む</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                                        <div id="playerControls" class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent p-3 sm:p-5 transition-opacity duration-300 flex flex-col gap-2.5 sm:gap-3 z-30 opacity-100">
+                        <div class="flex items-center gap-2 sm:gap-3">
+                            <span id="currentTime" class="text-xs text-brandMuted font-mono w-10 text-right select-none">00:00</span>
+                            <input type="range" id="seekBar" class="w-full" value="0" max="100">
+                            <span id="duration" class="text-xs text-brandMuted font-mono w-10 select-none">00:00</span>
+                        </div>
+                        
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2 sm:gap-4">
+                                <button id="skipBackBtn" onclick="skipTime(-appConfig.doubleTapSeek)" class="p-2 text-white hover:text-brandAccent transition-colors active:scale-90 min-w-[40px] min-h-[40px] flex items-center justify-center" title="10秒戻る">
+                                    <i data-lucide="rotate-ccw" class="w-5 h-5"></i>
+                                </button>
+                                
+                                <button id="playBtn" class="p-2 text-white hover:text-brandAccent transition-colors active:scale-90 min-w-[40px] min-h-[40px] flex items-center justify-center">
+                                    <i data-lucide="play" class="w-6 h-6 fill-current"></i>
+                                </button>
+
+                                <button id="skipForwardBtn" onclick="skipTime(appConfig.doubleTapSeek)" class="p-2 text-white hover:text-brandAccent transition-colors active:scale-90 min-w-[40px] min-h-[40px] flex items-center justify-center" title="10秒進む">
+                                    <i data-lucide="rotate-cw" class="w-5 h-5"></i>
+                                </button>
+
+                                <div class="flex items-center gap-1.5 ml-1 sm:ml-2">
+                                    <button id="muteBtn" class="p-2 text-white hover:text-brandMuted transition-colors min-w-[40px] min-h-[40px] flex items-center justify-center">
+                                        <i data-lucide="volume-2" class="w-5 h-5"></i>
+                                    </button>
+                                    <input type="range" id="volumeBar" class="w-14 sm:w-24 transition-all" value="100" max="100">
+                                    <span id="volumeLevel" class="hidden sm:inline-block text-[10px] text-brandMuted font-mono w-8 text-left select-none">100%</span>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-1.5 sm:gap-4">
+                                <button id="theaterBtn" onclick="toggleTheaterMode()" class="p-2 text-white hover:text-brandAccent transition-colors hidden sm:flex items-center justify-center min-w-[40px] min-h-[40px]" title="大画面モード切替 (T)">
+                                    <i data-lucide="rectangle-horizontal" class="w-5 h-5"></i>
+                                </button>
+                                <button id="pipBtn" onclick="togglePiP()" class="p-2 text-white hover:text-brandAccent transition-colors hidden sm:flex items-center justify-center min-w-[40px] min-h-[40px]" title="ピクチャーインピクチャー">
+                                    <i data-lucide="picture-in-picture-2" class="w-5 h-5"></i>
+                                </button>
+                                <button id="fullscreenBtn" class="p-2 text-white hover:text-brandAccent transition-colors min-w-[40px] min-h-[40px] flex items-center justify-center active:scale-90" title="全画面 (F)">
+                                    <i data-lucide="maximize" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="videoSpinner" class="absolute inset-0 bg-black/50 flex items-center justify-center pointer-events-none hidden z-20">
+                        <div class="login-spinner rounded-full h-12 w-12 border-4 border-brandAccent border-t-transparent"></div>
+                    </div>
+                </div>
+
+                                <div id="videoInfoBox" class="bg-brandSurface p-4 sm:p-6 rounded-theme border border-brandBorder space-y-4 shadow-xl transition-all duration-500">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div class="space-y-1">
+                            <h1 id="videoTitle" class="text-lg sm:text-xl lg:text-2xl font-black tracking-tight leading-tight text-brandText">読み込み中...</h1>
+                            <p class="text-xs text-brandMuted" id="videoDate">公開日: ----/--/--</p>
+                        </div>
+                        <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                            <button id="favoriteBtn" onclick="toggleFavorite()" title="お気に入り" class="p-3 bg-brandBg border border-brandBorder hover:border-rose-400 active:scale-95 transition-all rounded-full text-brandText shadow-md flex items-center justify-center min-w-[44px] min-h-[44px]">
+                                <i data-lucide="heart" class="w-5 h-5 text-rose-400 fill-transparent"></i>
+                            </button>
+                            <button id="watchLaterBtn" onclick="toggleWatchLater()" title="あとで見る" class="p-3 bg-brandBg border border-brandBorder hover:border-amber-400 active:scale-95 transition-all rounded-full text-brandText shadow-md flex items-center justify-center min-w-[44px] min-h-[44px]">
+                                <i data-lucide="bookmark" id="watchLaterIcon" class="w-5 h-5 text-amber-400 fill-transparent"></i>
+                            </button>
+                            <button onclick="shareVideo()" class="flex items-center gap-1.5 px-4 py-3 bg-brandBg border border-brandBorder hover:border-brandAccent active:scale-95 transition-all rounded-full text-xs font-bold text-brandText shadow-md min-h-[44px]">
+                                <i data-lucide="share-2" class="w-4 h-4 text-blue-400"></i><span>共有する</span>
+                            </button>
+                            <button id="downloadBtn" onclick="downloadMedia()" class="flex items-center gap-1.5 px-4 py-3 bg-brandBg border border-brandBorder hover:border-brandAccent active:scale-95 transition-all rounded-full text-xs font-bold text-brandText shadow-md min-h-[44px]">
+                                <i data-lucide="download" class="w-4 h-4 text-green-400"></i><span id="downloadBtnText">ダウンロード</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="p-4 bg-brandBg rounded-2xl text-sm leading-relaxed border border-brandBorder">
+                        <p id="videoDesc" class="whitespace-pre-line text-xs lg:text-sm text-brandMuted select-text">動画情報をロード中...</p>
+                    </div>
+                </div>
+            </div>
+
+                        <aside id="sidebarArea" class="space-y-4 transition-all duration-500">
+                <div class="flex items-center justify-between px-1">
+                    <h2 class="text-xs font-black text-brandMuted flex items-center gap-2 tracking-wider uppercase">
+                        <i data-lucide="play-circle" class="w-4 h-4 text-brandAccent animate-pulse"></i>
+                        <span>プレイリスト</span>
+                    </h2>
+                    
+                    <div class="flex items-center gap-2">
+                        <button id="addVideoBtn" onclick="openAddVideoModal()" class="hidden text-[11px] text-brandAccent hover:text-brandText bg-brandSurface px-3 py-2 rounded-xl border border-brandBorder transition-colors flex items-center gap-1.5 font-bold active:scale-95">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                            <span>追加</span>
+                        </button>
+                        <button id="randomBtn" onclick="playRandom()" title="ランダム再生" class="text-[11px] text-brandMuted hover:text-brandText bg-brandSurface px-3 py-2 rounded-xl border border-brandBorder transition-colors flex items-center gap-1.5 font-bold active:scale-95">
+                            <i data-lucide="shuffle" class="w-3.5 h-3.5"></i>
+                            <span>ランダム</span>
+                        </button>
+                        <div class="relative">
+                            <button onclick="toggleSortDropdown(event)" id="sortBtn" class="text-[11px] text-brandMuted hover:text-brandText bg-brandSurface px-3 py-2 rounded-xl border border-brandBorder transition-colors flex items-center gap-1.5 font-bold active:scale-95">
+                                <i data-lucide="arrow-down-up" class="w-3.5 h-3.5"></i>
+                                <span id="sortLabel">新しい順</span>
+                                <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-brandMuted"></i>
+                            </button>
+
+                            <div id="sortDropdown" class="hidden absolute right-0 top-full mt-2 w-32 bg-brandSurface border border-brandBorder rounded-xl shadow-2xl py-1 z-50 origin-top-right overflow-hidden">
+                                <div id="sortDropdownList" class="flex flex-col"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                                <div class="relative flex items-center">
+                    <i data-lucide="search" class="w-4 h-4 text-brandMuted absolute left-3.5 pointer-events-none"></i>
+                    <input type="text" id="searchInput" oninput="handleSearch()" placeholder="タイトル・ハッシュタグで検索..." 
+                           class="w-full bg-brandSurface border border-brandBorder rounded-xl pl-10 pr-9 py-2.5 text-xs text-brandText placeholder-brandMuted focus:border-brandAccent focus:outline-none transition-colors">
+                    <button id="searchClearBtn" onclick="clearSearch()" class="hidden absolute right-3 text-brandMuted hover:text-brandText transition-colors p-1">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <div id="playlist" class="space-y-3"></div>
+            </aside>
+        </div>
+
+        <footer id="mainFooter" class="bg-brandHeader border-t border-brandBorder py-6 mt-8 transition-all duration-500">
+            <div class="max-w-7xl mx-auto px-4 text-center space-y-1">
+                <p class="text-xs text-brandMuted">© 2026 GVN Organization - <a href="https://minecraft-jp.github.io/GVN-Organization/" target="_blank" class="gradient underline font-bold hover:opacity-80 transition-opacity">GVN ORG</a></p>
+            </div>
+        </footer>
+    </div>
+
+        <div id="settingsModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-300">
+        <div id="settingsModalScaleWrapper" class="transform scale-95 transition-transform duration-300 w-full max-w-lg">
+        <div class="bg-brandSurface border border-brandBorder rounded-theme w-full max-h-[90vh] p-6 shadow-2xl relative overflow-y-auto scrollbar-thin" id="settingsModalContent">
+            
+            <button onclick="closeSettings()" class="absolute top-4 right-4 text-brandMuted hover:text-brandAccent transition active:scale-90 bg-brandBg p-2 rounded-full border border-brandBorder">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            
+            <h2 class="text-xl font-black text-brandAccent mb-6 flex items-center gap-2 tracking-widest border-b border-brandBorder pb-3">
+                <i data-lucide="sliders" class="w-5 h-5"></i> SETTINGS
+            </h2>
+            
+            <h3 class="text-sm font-bold text-brandText mb-4 flex items-center gap-2 bg-brandBg py-2 px-3 rounded-lg border border-brandBorder">
+                <i data-lucide="play-square" class="w-4 h-4 text-brandAccent"></i> 動作設定 (Player)
+            </h3>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                <label class="block">
+                    <span class="text-xs text-brandMuted block mb-1 font-bold">再生速度</span>
+                    <select id="config-playbackRate" class="w-full h-11 px-3 rounded bg-brandBg text-brandText border border-brandBorder outline-none font-bold text-sm" onchange="updateAppConfig('playbackRate', parseFloat(this.value))">
+                        <option value="0.5">0.5x (スロー)</option>
+                        <option value="1.0">1.0x (標準)</option>
+                        <option value="1.25">1.25x (少し速い)</option>
+                        <option value="1.5">1.5x (速い)</option>
+                        <option value="2.0">2.0x (超速)</option>
+                    </select>
+                </label>
+
+                <label class="block">
+                    <span class="text-xs text-brandMuted block mb-1 font-bold">デフォルト音量 (<span id="volumeValueLabel">100</span>%)</span>
+                    <input type="range" id="config-defaultVolume" min="0" max="100" step="5" class="w-full h-11 accent-brandAccent" oninput="document.getElementById('volumeValueLabel').textContent = this.value" onchange="updateAppConfig('defaultVolume', parseInt(this.value))">
+                </label>
+
+                <div class="flex items-center justify-between p-3 border border-brandBorder rounded bg-brandBg h-11">
+                    <span class="text-xs font-bold text-brandText">自動再生 (選択時)</span>
+                    <label class="flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" id="config-autoPlay" class="sr-only toggle-checkbox" onchange="updateAppConfig('autoPlay', this.checked)">
+                            <div class="block bg-brandSurface border border-brandBorder w-10 h-6 rounded-full transition toggle-label"></div>
+                            <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200"></div>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="flex items-center justify-between p-3 border border-brandBorder rounded bg-brandBg h-11">
+                    <span class="text-xs font-bold text-brandText">次の動画を自動再生</span>
+                    <label class="flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" id="config-autoNext" class="sr-only toggle-checkbox" onchange="updateAppConfig('autoNext', this.checked)">
+                            <div class="block bg-brandSurface border border-brandBorder w-10 h-6 rounded-full transition toggle-label"></div>
+                            <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200"></div>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="flex items-center justify-between p-3 border border-brandBorder rounded bg-brandBg h-11">
+                    <span class="text-xs font-bold text-brandText">ループ再生</span>
+                    <label class="flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" id="config-loop" class="sr-only toggle-checkbox" onchange="updateAppConfig('loop', this.checked)">
+                            <div class="block bg-brandSurface border border-brandBorder w-10 h-6 rounded-full transition toggle-label"></div>
+                            <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200"></div>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="flex items-center justify-between p-3 border border-brandBorder rounded bg-brandBg h-11">
+                    <span class="text-xs font-bold text-brandText">ミュート状態を記憶</span>
+                    <label class="flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" id="config-rememberMute" class="sr-only toggle-checkbox" onchange="updateAppConfig('rememberMute', this.checked)">
+                            <div class="block bg-brandSurface border border-brandBorder w-10 h-6 rounded-full transition toggle-label"></div>
+                            <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200"></div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <h3 class="text-sm font-bold text-brandText mb-4 flex items-center gap-2 bg-brandBg py-2 px-3 rounded-lg border border-brandBorder">
+                <i data-lucide="hand" class="w-4 h-4 text-brandAccent"></i> 操作・ジェスチャー設定
+            </h3>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                <label class="block">
+                    <span class="text-xs text-brandMuted block mb-1 font-bold">ダブルタップのシーク秒数</span>
+                    <select id="config-doubleTapSeek" class="w-full h-11 px-3 rounded bg-brandBg text-brandText border border-brandBorder outline-none font-bold text-sm" onchange="updateAppConfig('doubleTapSeek', parseInt(this.value))">
+                        <option value="5">5秒</option>
+                        <option value="10">10秒</option>
+                        <option value="15">15秒</option>
+                        <option value="30">30秒</option>
+                    </select>
+                </label>
+
+                <label class="block">
+                    <span class="text-xs text-brandMuted block mb-1 font-bold">矢印キーのシーク秒数</span>
+                    <select id="config-arrowKeySeek" class="w-full h-11 px-3 rounded bg-brandBg text-brandText border border-brandBorder outline-none font-bold text-sm" onchange="updateAppConfig('arrowKeySeek', parseInt(this.value))">
+                        <option value="5">5秒</option>
+                        <option value="10">10秒</option>
+                        <option value="15">15秒</option>
+                        <option value="30">30秒</option>
+                    </select>
+                </label>
+
+                <label class="block sm:col-span-2">
+                    <span class="text-xs text-brandMuted block mb-1 font-bold">コントロールバーの自動非表示</span>
+                    <select id="config-controlsHideDelay" class="w-full h-11 px-3 rounded bg-brandBg text-brandText border border-brandBorder outline-none font-bold text-sm" onchange="updateAppConfig('controlsHideDelay', parseInt(this.value))">
+                        <option value="0">常に表示する</option>
+                        <option value="2">2秒後に隠す</option>
+                        <option value="3">3秒後に隠す</option>
+                        <option value="5">5秒後に隠す</option>
+                        <option value="10">10秒後に隠す</option>
+                    </select>
+                </label>
+            </div>
+
+            <h3 class="text-sm font-bold text-brandText mb-4 flex items-center gap-2 bg-brandBg py-2 px-3 rounded-lg border border-brandBorder">
+                <i data-lucide="palette" class="w-4 h-4 text-brandAccent"></i> 表示設定
+            </h3>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                <label class="block">
+                    <span class="text-xs text-brandMuted block mb-1 font-bold">アクセントカラー</span>
+                    <input type="color" id="config-accentColor" class="w-full h-11 px-1 py-1 rounded bg-brandBg border border-brandBorder cursor-pointer" onchange="updateAppConfig('accentColor', this.value)">
+                </label>
+
+                <label class="block">
+                    <span class="text-xs text-brandMuted block mb-1 font-bold">UIサイズ</span>
+                    <select id="config-uiScale" class="w-full h-11 px-3 rounded bg-brandBg text-brandText border border-brandBorder outline-none font-bold text-sm" onchange="updateAppConfig('uiScale', parseInt(this.value))">
+                        <option value="85">小</option>
+                        <option value="100">標準</option>
+                        <option value="115">大</option>
+                        <option value="130">特大</option>
+                    </select>
+                </label>
+
+                <label class="block">
+                    <span class="text-xs text-brandMuted block mb-1 font-bold">テーマ</span>
+                    <select id="config-theme" class="w-full h-11 px-3 rounded bg-brandBg text-brandText border border-brandBorder outline-none font-bold text-sm" onchange="updateAppConfig('theme', this.value)">
+                        <option value="dark">ダーク</option>
+                        <option value="light">ライト</option>
+                        <option value="auto">端末に合わせる</option>
+                    </select>
+                </label>
+
+                <label class="block">
+                    <span class="text-xs text-brandMuted block mb-1 font-bold">プレイリストの並び順(初期値)</span>
+                    <select id="config-defaultSortOrder" class="w-full h-11 px-3 rounded bg-brandBg text-brandText border border-brandBorder outline-none font-bold text-sm" onchange="updateAppConfig('defaultSortOrder', this.value)">
+                        <option value="newest">新しい順</option>
+                        <option value="oldest">古い順</option>
+                    </select>
+                </label>
+
+                <div class="flex items-center justify-between p-3 border border-brandBorder rounded bg-brandBg h-11">
+                    <span class="text-xs font-bold text-brandText">大画面モードで開始</span>
+                    <label class="flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" id="config-theaterModeDefault" class="sr-only toggle-checkbox" onchange="updateAppConfig('theaterModeDefault', this.checked)">
+                            <div class="block bg-brandSurface border border-brandBorder w-10 h-6 rounded-full transition toggle-label"></div>
+                            <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200"></div>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="flex items-center justify-between p-3 border border-brandBorder rounded bg-brandBg h-11 sm:col-span-2">
+                    <span class="text-xs font-bold text-brandText">モーションを減らす (アニメーション軽減)</span>
+                    <label class="flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" id="config-reduceMotion" class="sr-only toggle-checkbox" onchange="updateAppConfig('reduceMotion', this.checked)">
+                            <div class="block bg-brandSurface border border-brandBorder w-10 h-6 rounded-full transition toggle-label"></div>
+                            <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200"></div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <h3 class="text-sm font-bold text-brandText mb-4 flex items-center gap-2 bg-brandBg py-2 px-3 rounded-lg border border-brandBorder">
+                <i data-lucide="database" class="w-4 h-4 text-brandAccent"></i> データ・通知
+            </h3>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                <div class="flex items-center justify-between p-3 border border-brandBorder rounded bg-brandBg h-11">
+                    <span class="text-xs font-bold text-brandText">視聴履歴を自動記録</span>
+                    <label class="flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" id="config-recordHistory" class="sr-only toggle-checkbox" onchange="updateAppConfig('recordHistory', this.checked)">
+                            <div class="block bg-brandSurface border border-brandBorder w-10 h-6 rounded-full transition toggle-label"></div>
+                            <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200"></div>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="flex items-center justify-between p-3 border border-brandBorder rounded bg-brandBg h-11">
+                    <span class="text-xs font-bold text-brandText">通知設定を開く</span>
+                    <button onclick="closeSettings(); openNotificationSettingsModal();" class="text-xs bg-brandSurface border border-brandBorder hover:border-brandAccent text-brandText px-3 py-1.5 rounded-lg font-bold transition">
+                        設定
+                    </button>
+                </div>
+
+                <div class="flex items-center justify-between p-3 border border-brandBorder rounded bg-brandBg h-11">
+                    <span class="text-xs font-bold text-brandText">データをエクスポート</span>
+                    <button onclick="exportUserData()" class="text-xs bg-brandSurface border border-brandBorder hover:border-brandAccent text-brandText px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i> 保存
+                    </button>
+                </div>
+
+                <div class="flex items-center justify-between p-3 border border-brandBorder rounded bg-brandBg h-11">
+                    <span class="text-xs font-bold text-brandText">データをインポート</span>
+                    <button onclick="document.getElementById('importFileInput').click()" class="text-xs bg-brandSurface border border-brandBorder hover:border-brandAccent text-brandText px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1">
+                        <i data-lucide="upload" class="w-3.5 h-3.5"></i> 読込
+                    </button>
+                    <input type="file" id="importFileInput" accept="application/json" class="hidden" onchange="importUserData(this)">
+                </div>
+
+                <div class="flex items-center justify-between p-3 border border-red-900/50 rounded bg-brandBg h-11 sm:col-span-2">
+                    <span class="text-xs font-bold text-red-500">設定・保存データを全て初期化</span>
+                    <button onclick="resetAllSettingsAndData()" class="text-xs bg-red-950/40 border border-red-900 hover:bg-red-900/50 text-red-400 px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> 初期化
+                    </button>
+                </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-brandBorder flex justify-end gap-3 sticky bottom-0 bg-brandSurface pb-1">
+                <button onclick="closeSettings()" class="px-6 py-3 bg-brandAccent hover:bg-brandAccentHover text-white rounded-full transition text-sm font-bold shadow-lg shadow-brandAccent/30">
+                    閉じる
+                </button>
+            </div>
+        </div>
+        </div>
+    </div>
+
+        <div id="notificationSettingsModal" class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 hidden">
+        <div class="bg-brandSurface border border-brandBorder rounded-theme max-w-md w-full max-h-[85vh] flex flex-col p-6 shadow-2xl">
+            <div class="flex justify-between items-center pb-3 border-b border-brandBorder flex-shrink-0">
+                <h3 class="text-lg font-bold text-brandText flex items-center gap-2"><i data-lucide="bell" class="text-brandAccent"></i><span>通知設定（個別切り替え）</span></h3>
+                <button onclick="closeNotificationSettingsModal()" class="text-brandMuted hover:text-brandText transition-colors p-2"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            
+            <div class="mt-3 relative flex items-center flex-shrink-0">
+                <i data-lucide="search" class="w-4 h-4 text-brandMuted absolute left-3.5 pointer-events-none"></i>
+                <input type="text" id="notifSearchInput" oninput="filterNotificationItems()" placeholder="通知項目を検索..." 
+                       class="w-full bg-brandBg border border-brandBorder rounded-xl pl-10 pr-9 py-2.5 text-xs text-brandText placeholder-brandMuted focus:border-brandAccent focus:outline-none transition-colors">
+                <button id="notifSearchClearBtn" onclick="clearNotifSearch()" class="hidden absolute right-3 text-brandMuted hover:text-brandText transition-colors p-1">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <div id="notifItemsContainer" class="overflow-y-auto flex-grow my-3 space-y-3 scrollbar-thin max-h-[50vh] pr-1">
+                
+                <div class="notif-item flex items-center justify-between p-3 bg-brandBg rounded-xl border border-brandBorder" data-title="再生速度の変更" data-desc="速度を変更した際の通知">
+                    <div>
+                        <p class="text-xs font-bold text-brandText">再生速度の変更</p>
+                        <p class="text-[10px] text-brandMuted">速度を変更した際の通知</p>
+                    </div>
+                    <label class="flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" id="notif-playbackRate" class="sr-only toggle-checkbox" checked onchange="updateNotificationCategory('playbackRate', this.checked)">
+                            <div class="block bg-brandSurface border border-brandBorder w-10 h-6 rounded-full transition toggle-label"></div>
+                            <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200"></div>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="notif-item flex items-center justify-between p-3 bg-brandBg rounded-xl border border-brandBorder" data-title="共有・リンクコピー完了" data-desc="共有メニュー起動、URLコピー完了通知">
+                    <div>
+                        <p class="text-xs font-bold text-brandText">共有・リンクコピー完了</p>
+                        <p class="text-[10px] text-brandMuted">共有メニュー起動、URLコピー完了通知</p>
+                    </div>
+                    <label class="flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" id="notif-share" class="sr-only toggle-checkbox" checked onchange="updateNotificationCategory('share', this.checked)">
+                            <div class="block bg-brandSurface border border-brandBorder w-10 h-6 rounded-full transition toggle-label"></div>
+                            <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200"></div>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="notif-item flex items-center justify-between p-3 bg-brandBg rounded-xl border border-brandBorder" data-title="「あとで見る」追加・削除" data-desc="リスト追加、削除操作の完了通知">
+                    <div>
+                        <p class="text-xs font-bold text-brandText">「あとで見る」追加・削除</p>
+                        <p class="text-[10px] text-brandMuted">リスト追加、削除操作の完了通知</p>
+                    </div>
+                    <label class="flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" id="notif-watchLater" class="sr-only toggle-checkbox" checked onchange="updateNotificationCategory('watchLater', this.checked)">
+                            <div class="block bg-brandSurface border border-brandBorder w-10 h-6 rounded-full transition toggle-label"></div>
+                            <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200"></div>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="notif-item flex items-center justify-between p-3 bg-brandBg rounded-xl border border-brandBorder" data-title="視聴履歴の消去" data-desc="履歴クリア操作の完了通知">
+                    <div>
+                        <p class="text-xs font-bold text-brandText">視聴履歴の消去</p>
+                        <p class="text-[10px] text-brandMuted">履歴クリア操作の完了通知</p>
+                    </div>
+                    <label class="flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" id="notif-historyClear" class="sr-only toggle-checkbox" checked onchange="updateNotificationCategory('historyClear', this.checked)">
+                            <div class="block bg-brandSurface border border-brandBorder w-10 h-6 rounded-full transition toggle-label"></div>
+                            <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200"></div>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="notif-item flex items-center justify-between p-3 bg-brandBg rounded-xl border border-brandBorder" data-title="続きから再生（レジューム）" data-desc="前回停止位置からの再開通知">
+                    <div>
+                        <p class="text-xs font-bold text-brandText">続きから再生（レジューム）</p>
+                        <p class="text-[10px] text-brandMuted">前回停止位置からの再開通知</p>
+                    </div>
+                    <label class="flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" id="notif-resume" class="sr-only toggle-checkbox" checked onchange="updateNotificationCategory('resume', this.checked)">
+                            <div class="block bg-brandSurface border border-brandBorder w-10 h-6 rounded-full transition toggle-label"></div>
+                            <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200"></div>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="notif-item flex items-center justify-between p-3 bg-brandBg rounded-xl border border-brandBorder" data-title="大画面モードの切替" data-desc="シアターモードON/OFF時の通知">
+                    <div>
+                        <p class="text-xs font-bold text-brandText">大画面モードの切替</p>
+                        <p class="text-[10px] text-brandMuted">シアターモードON/OFF時の通知</p>
+                    </div>
+                    <label class="flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" id="notif-theaterMode" class="sr-only toggle-checkbox" checked onchange="updateNotificationCategory('theaterMode', this.checked)">
+                            <div class="block bg-brandSurface border border-brandBorder w-10 h-6 rounded-full transition toggle-label"></div>
+                            <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200"></div>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="notif-item flex items-center justify-between p-3 bg-brandBg rounded-xl border border-brandBorder" data-title="次の動画への自動再生" data-desc="プレイリストの続きへ自動遷移した際の通知">
+                    <div>
+                        <p class="text-xs font-bold text-brandText">次の動画への自動再生</p>
+                        <p class="text-[10px] text-brandMuted">プレイリストの続きへ自動遷移した際の通知</p>
+                    </div>
+                    <label class="flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" id="notif-autoNext" class="sr-only toggle-checkbox" checked onchange="updateNotificationCategory('autoNext', this.checked)">
+                            <div class="block bg-brandSurface border border-brandBorder w-10 h-6 rounded-full transition toggle-label"></div>
+                            <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200"></div>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="notif-item flex items-center justify-between p-3 bg-brandBg rounded-xl border border-brandBorder" data-title="画像保存・ダウンロード" data-desc="画像の保存開始、動画ダウンロード開始通知">
+                    <div>
+                        <p class="text-xs font-bold text-brandText">画像保存・ダウンロード</p>
+                        <p class="text-[10px] text-brandMuted">画像の保存開始、動画ダウンロード開始通知</p>
+                    </div>
+                    <label class="flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" id="notif-download" class="sr-only toggle-checkbox" checked onchange="updateNotificationCategory('download', this.checked)">
+                            <div class="block bg-brandSurface border border-brandBorder w-10 h-6 rounded-full transition toggle-label"></div>
+                            <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200"></div>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="notif-item flex items-center justify-between p-3 bg-brandBg rounded-xl border border-brandBorder" data-title="ログイン・ログアウト" data-desc="ログアウト完了、ログイン必須の案内通知">
+                    <div>
+                        <p class="text-xs font-bold text-brandText">ログイン・ログアウト</p>
+                        <p class="text-[10px] text-brandMuted">ログアウト完了、ログイン必須の案内通知</p>
+                    </div>
+                    <label class="flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" id="notif-account" class="sr-only toggle-checkbox" checked onchange="updateNotificationCategory('account', this.checked)">
+                            <div class="block bg-brandSurface border border-brandBorder w-10 h-6 rounded-full transition toggle-label"></div>
+                            <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200"></div>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="notif-item flex items-center justify-between p-3 bg-brandBg rounded-xl border border-brandBorder" data-title="データのバックアップ・初期化" data-desc="エクスポート、インポート、全データ初期化の通知">
+                    <div>
+                        <p class="text-xs font-bold text-brandText">データのバックアップ・初期化</p>
+                        <p class="text-[10px] text-brandMuted">エクスポート、インポート、全データ初期化の通知</p>
+                    </div>
+                    <label class="flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" id="notif-data" class="sr-only toggle-checkbox" checked onchange="updateNotificationCategory('data', this.checked)">
+                            <div class="block bg-brandSurface border border-brandBorder w-10 h-6 rounded-full transition toggle-label"></div>
+                            <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200"></div>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="notif-item flex items-center justify-between p-3 bg-brandBg rounded-xl border border-brandBorder" data-title="その他（エラー等）" data-desc="上記に当てはまらないその他の通知">
+                    <div>
+                        <p class="text-xs font-bold text-brandText">その他（エラー等）</p>
+                        <p class="text-[10px] text-brandMuted">上記に当てはまらないその他の通知</p>
+                    </div>
+                    <label class="flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" id="notif-system" class="sr-only toggle-checkbox" checked onchange="updateNotificationCategory('system', this.checked)">
+                            <div class="block bg-brandSurface border border-brandBorder w-10 h-6 rounded-full transition toggle-label"></div>
+                            <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200"></div>
+                        </div>
+                    </label>
+                </div>
+
+                <div id="noNotifMatchMsg" class="hidden text-center py-6 text-brandMuted text-xs font-bold">
+                    一致する通知項目が見つかりません
+                </div>
+            </div>
+
+            <div class="pt-3 border-t border-brandBorder flex gap-2 flex-shrink-0">
+                <button onclick="setAllNotifications(false)" class="w-1/2 py-3 bg-brandBg border border-brandBorder hover:border-brandAccent text-brandMuted hover:text-brandText rounded-xl text-xs font-bold transition-all min-h-[44px]">すべてOFF</button>
+                <button onclick="setAllNotifications(true)" class="w-1/2 py-3 bg-brandAccent hover:bg-brandAccentHover text-white rounded-xl text-xs font-bold transition-all shadow-lg min-h-[44px]">すべてON</button>
+            </div>
+        </div>
+    </div>
+
+        <div id="resumeModal" class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 hidden">
+        <div class="bg-brandSurface border border-brandBorder rounded-theme max-w-sm w-full p-6 shadow-2xl space-y-4 text-center">
+            <div class="w-12 h-12 bg-brandAccent/20 text-brandAccent rounded-full flex items-center justify-center mx-auto mb-2">
+                <i data-lucide="play-circle" class="w-6 h-6"></i>
+            </div>
+            <h3 class="text-base font-bold text-brandText">前回の続きから再生しますか？</h3>
+            <p id="resumeTimeText" class="text-xs text-brandMuted">再生位置: 00:00</p>
+            <div class="flex gap-3 pt-2">
+                <button onclick="confirmResume(false)" class="w-1/2 py-3 bg-brandBg border border-brandBorder hover:border-brandText text-brandMuted hover:text-brandText rounded-xl text-xs font-bold transition-all min-h-[44px]">最初から</button>
+                <button onclick="confirmResume(true)" class="w-1/2 py-3 bg-brandAccent hover:bg-brandAccentHover text-white rounded-xl text-xs font-bold transition-all shadow-lg min-h-[44px]">続きから再生</button>
+            </div>
+        </div>
+    </div>
+
+        <div id="shortcutsModal" class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 hidden">
+        <div class="bg-brandSurface border border-brandBorder rounded-theme max-w-sm w-full p-6 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center pb-3 border-b border-brandBorder">
+                <h3 class="text-base font-bold text-brandText flex items-center gap-2"><i data-lucide="keyboard" class="text-brandAccent"></i><span>ショートカットキー</span></h3>
+                <button onclick="closeShortcutsModal()" class="text-brandMuted hover:text-brandText transition-colors p-2"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="space-y-2 text-xs">
+                <div class="flex justify-between items-center bg-brandBg p-3 rounded-xl border border-brandBorder"><span class="text-brandMuted font-mono">Space / K</span><span class="font-bold text-brandText">再生 / 一時停止</span></div>
+                <div class="flex justify-between items-center bg-brandBg p-3 rounded-xl border border-brandBorder"><span class="text-brandMuted font-mono">T</span><span class="font-bold text-brandText">大画面モード切替</span></div>
+                <div class="flex justify-between items-center bg-brandBg p-3 rounded-xl border border-brandBorder"><span class="text-brandMuted font-mono">F</span><span class="font-bold text-brandText">全画面表示</span></div>
+                <div class="flex justify-between items-center bg-brandBg p-3 rounded-xl border border-brandBorder"><span class="text-brandMuted font-mono">M</span><span class="font-bold text-brandText">ミュート切り替え</span></div>
+                <div class="flex justify-between items-center bg-brandBg p-3 rounded-xl border border-brandBorder"><span class="text-brandMuted font-mono">← / →</span><span class="font-bold text-brandText">5秒移動 / 画像切替</span></div>
+                <div class="flex justify-between items-center bg-brandBg p-3 rounded-xl border border-brandBorder"><span class="text-brandMuted font-mono">↑ / ↓</span><span class="font-bold text-brandText">音量 5% 変更</span></div>
+            </div>
+            <button onclick="closeShortcutsModal()" class="w-full py-3 bg-brandBg border border-brandBorder hover:border-brandAccent text-brandText rounded-xl text-xs font-bold transition-all">閉じる</button>
+        </div>
+    </div>
+
+        <div id="historyModal" class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 hidden">
+        <div class="bg-brandSurface border border-brandBorder rounded-theme max-w-md w-full max-h-[85vh] flex flex-col p-6 shadow-2xl">
+            <div class="flex justify-between items-center pb-3 border-b border-brandBorder flex-shrink-0">
+                <h3 class="text-lg font-bold text-brandText flex items-center gap-2"><i data-lucide="history" class="text-brandAccent"></i><span>視聴履歴</span></h3>
+                <button onclick="closeHistoryModal()" class="text-brandMuted hover:text-brandText transition-colors p-2"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div id="historyListContainer" class="overflow-y-auto flex-grow py-4 space-y-3 scrollbar-thin"></div>
+            <div class="pt-3 border-t border-brandBorder flex gap-2 flex-shrink-0">
+                <button onclick="clearHistory()" class="w-1/2 py-3 bg-red-950/40 border border-red-900/60 hover:bg-red-900/60 text-red-400 rounded-xl text-xs font-bold transition-all min-h-[44px]">履歴を消去</button>
+                <button onclick="closeHistoryModal()" class="w-1/2 py-3 bg-brandBg border border-brandBorder hover:border-brandAccent text-brandText rounded-xl text-xs font-bold transition-all min-h-[44px]">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+        <div id="watchLaterModal" class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 hidden">
+        <div class="bg-brandSurface border border-brandBorder rounded-theme max-w-md w-full max-h-[85vh] flex flex-col p-6 shadow-2xl">
+            <div class="flex justify-between items-center pb-3 border-b border-brandBorder flex-shrink-0">
+                <h3 class="text-lg font-bold text-brandText flex items-center gap-2"><i data-lucide="bookmark" class="text-amber-400"></i><span>あとで見る</span></h3>
+                <button onclick="closeWatchLaterModal()" class="text-brandMuted hover:text-brandText transition-colors p-2"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div id="watchLaterListContainer" class="overflow-y-auto flex-grow py-4 space-y-3 scrollbar-thin"></div>
+            <div class="pt-3 border-t border-brandBorder flex-shrink-0">
+                <button onclick="closeWatchLaterModal()" class="w-full py-3 bg-brandBg border border-brandBorder hover:border-brandAccent text-brandText rounded-xl text-xs font-bold transition-all min-h-[44px]">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+        <div id="favoritesModal" class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 hidden">
+        <div class="bg-brandSurface border border-brandBorder rounded-theme max-w-md w-full max-h-[85vh] flex flex-col p-6 shadow-2xl">
+            <div class="flex justify-between items-center pb-3 border-b border-brandBorder flex-shrink-0">
+                <h3 class="text-lg font-bold text-brandText flex items-center gap-2"><i data-lucide="heart" class="text-rose-400"></i><span>お気に入り</span></h3>
+                <button onclick="closeFavoritesModal()" class="text-brandMuted hover:text-brandText transition-colors p-2"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div id="favoritesListContainer" class="overflow-y-auto flex-grow py-4 space-y-3 scrollbar-thin"></div>
+            <div class="pt-3 border-t border-brandBorder flex-shrink-0">
+                <button onclick="closeFavoritesModal()" class="w-full py-3 bg-brandBg border border-brandBorder hover:border-brandAccent text-brandText rounded-xl text-xs font-bold transition-all min-h-[44px]">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+        <div id="downloadModal" class="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 hidden">
+        <div id="downloadModalContainer" class="bg-brandSurface border border-brandBorder rounded-theme max-w-md w-full max-h-[85vh] flex flex-col p-6 shadow-2xl">
+            <div class="flex justify-between items-center pb-3 border-b border-brandBorder flex-shrink-0">
+                <h3 class="text-lg font-bold text-brandText flex items-center gap-2"><i data-lucide="info" class="text-brandAccent"></i><span>ダウンロード方法</span></h3>
+                <button onclick="closeModal()" class="text-brandMuted hover:text-brandText transition-colors p-2"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="overflow-y-auto flex-grow py-4 pr-1 space-y-4 scrollbar-thin">
+                <div class="space-y-3">
+                    <details class="group bg-brandBg rounded-2xl border border-brandBorder overflow-hidden" open>
+                        <summary class="flex justify-between items-center p-4 cursor-pointer select-none hover:bg-brandSurface transition-colors">
+                            <span class="text-sm font-black text-brandText flex items-center gap-2"><i data-lucide="smartphone" class="w-4 h-4 text-blue-400"></i>iPhone</span>
+                            <i data-lucide="chevron-down" class="w-4 h-4 text-brandMuted transition-transform duration-200 group-open:rotate-180"></i>
+                        </summary>
+                        <div class="p-4 border-t border-brandBorder text-xs text-brandMuted space-y-3 leading-relaxed">
+                            <p>1. こちらを「<a href="https://www.icloud.com/shortcuts/a6ca0b7cf395429bbdef8a541cdd6b1e" target="_blank" class="gradient underline font-bold hover:opacity-80 transition-opacity">ダウンロード</a>」してください。</p>
+                            <p>2. 次に共有マークを押して、先ほどダウンロードしたショートカット（保存）を実行。</p>
+                            <p>3. 許可を求められたら「常に許可」を押してください。</p>
+                            <div class="pt-2 border-t border-brandBorder">手順を覚えたら「<a id="iphoneDirectLink" href="#" target="_blank" class="gradient underline font-bold">こちら</a>」</div>
+                        </div>
+                    </details>
+                    <details class="group bg-brandBg rounded-2xl border border-brandBorder overflow-hidden">
+                        <summary class="flex justify-between items-center p-4 cursor-pointer select-none hover:bg-brandSurface transition-colors">
+                            <span class="text-sm font-black text-brandText flex items-center gap-2"><i data-lucide="smartphone" class="w-4 h-4 text-green-400"></i>Android</span>
+                            <i data-lucide="chevron-down" class="w-4 h-4 text-brandMuted transition-transform duration-200 group-open:rotate-180"></i>
+                        </summary>
+                        <div class="p-4 border-t border-brandBorder text-xs text-brandMuted space-y-3 leading-relaxed">
+                            <p>1. 動画を長押しして保存を選択</p>
+                            <div class="pt-2 border-t border-brandBorder">手順を覚えたら「<a id="androidDirectLink" href="#" target="_blank" class="gradient underline font-bold">こちら</a>」</div>
+                        </div>
+                    </details>
+                </div>
+            </div>
+            <div class="pt-3 border-t border-brandBorder flex-shrink-0">
+                <button onclick="closeModal()" class="w-full py-3 bg-brandBg border border-brandBorder hover:border-brandAccent active:scale-95 transition-all text-brandText rounded-xl text-xs font-bold min-h-[44px]">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+        <div id="addVideoModal" class="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 hidden">
+        <div class="bg-brandSurface border border-brandBorder rounded-theme max-w-md w-full max-h-[85vh] flex flex-col p-6 shadow-2xl">
+            <div class="flex justify-between items-center pb-3 border-b border-brandBorder flex-shrink-0">
+                <h3 class="text-lg font-bold text-brandText flex items-center gap-2"><i data-lucide="plus-circle" class="text-brandAccent"></i><span>動画・画像を追加</span></h3>
+                <button onclick="closeAddVideoModal()" class="text-brandMuted hover:text-brandText transition-colors p-2"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <form id="addVideoForm" onsubmit="submitAddVideo(event)" class="overflow-y-auto flex-grow py-4 pr-1 space-y-3 scrollbar-thin">
+                <div>
+                    <label class="text-[11px] font-bold text-brandMuted block mb-1">タイプ</label>
+                    <select id="addVideoType" onchange="toggleAddVideoFields()" class="w-full bg-brandBg border border-brandBorder rounded-xl px-3 py-2.5 text-xs text-brandText focus:border-brandAccent focus:outline-none">
+                        <option value="video">動画</option>
+                        <option value="image">画像</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-[11px] font-bold text-brandMuted block mb-1">タイトル</label>
+                    <input type="text" id="addVideoTitle" required class="w-full bg-brandBg border border-brandBorder rounded-xl px-3 py-2.5 text-xs text-brandText focus:border-brandAccent focus:outline-none">
+                </div>
+                <div id="addVideoUrlField">
+                    <label class="text-[11px] font-bold text-brandMuted block mb-1">動画URL</label>
+                    <input type="text" id="addVideoUrl" class="w-full bg-brandBg border border-brandBorder rounded-xl px-3 py-2.5 text-xs text-brandText focus:border-brandAccent focus:outline-none">
+                </div>
+                <div id="addVideoImagesField" class="hidden">
+                    <label class="text-[11px] font-bold text-brandMuted block mb-1">画像URL(1行に1つ)</label>
+                    <textarea id="addVideoImages" rows="3" class="w-full bg-brandBg border border-brandBorder rounded-xl px-3 py-2.5 text-xs text-brandText focus:border-brandAccent focus:outline-none"></textarea>
+                </div>
+                <div>
+                    <label class="text-[11px] font-bold text-brandMuted block mb-1">サムネイルURL</label>
+                    <input type="text" id="addVideoThumbnail" required class="w-full bg-brandBg border border-brandBorder rounded-xl px-3 py-2.5 text-xs text-brandText focus:border-brandAccent focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[11px] font-bold text-brandMuted block mb-1">再生時間/枚数表記</label>
+                        <input type="text" id="addVideoDuration" placeholder="例: 0:25 / 8枚" required class="w-full bg-brandBg border border-brandBorder rounded-xl px-3 py-2.5 text-xs text-brandText focus:border-brandAccent focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-bold text-brandMuted block mb-1">日付</label>
+                        <input type="text" id="addVideoDate" placeholder="2026/10/02" required class="w-full bg-brandBg border border-brandBorder rounded-xl px-3 py-2.5 text-xs text-brandText focus:border-brandAccent focus:outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-[11px] font-bold text-brandMuted block mb-1">説明</label>
+                    <textarea id="addVideoDesc" rows="2" class="w-full bg-brandBg border border-brandBorder rounded-xl px-3 py-2.5 text-xs text-brandText focus:border-brandAccent focus:outline-none"></textarea>
+                </div>
+                <button type="submit" class="w-full py-3 bg-brandAccent active:scale-95 transition-all text-black rounded-xl text-xs font-bold min-h-[44px]">追加する</button>
+            </form>
+        </div>
+    </div>
+
+        <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-10 opacity-0 pointer-events-none transition-all duration-300 bg-brandSurface border border-brandBorder text-brandText px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3">
+        <div class="bg-brandAccent/20 text-brandAccent p-1 rounded-md"><i data-lucide="bell" class="w-4 h-4"></i></div>
+        <span id="toastMsg" class="text-xs font-bold">通知メッセージ</span>
+    </div>
+
+        
+`;
+
+(function buildAppLayout() {
+    const body = document.body;
+    Array.from(body.children).forEach((el) => {
+        if (el.tagName !== 'SCRIPT') el.remove();
+    });
+    body.removeAttribute('style');
+    body.className = 'min-h-screen flex flex-col selection:bg-brandAccent selection:text-white transition-colors duration-500';
+    body.insertAdjacentHTML('afterbegin', APP_LAYOUT_HTML);
+})();
+
 window.__firebase_config = JSON.stringify({
     apiKey: "AIzaSyCMct_8D2DIqRifQIOsapJxRZah53o5RVs",
     authDomain: "gvn-org-cloud.firebaseapp.com",
@@ -142,7 +988,8 @@ window.__firebase_config = JSON.stringify({
             defaultSortOrder: "newest",
             accentColor: "#ea580c",
             uiScale: 100,
-            recordHistory: true
+            recordHistory: true,
+            theme: "dark"
         };
         const appConfig = Object.assign({}, DEFAULT_APP_CONFIG, getStoredData('app_config', {}));
 
@@ -256,6 +1103,9 @@ window.__firebase_config = JSON.stringify({
                 case 'uiScale':
                     applyUiScale(value);
                     break;
+                case 'theme':
+                    applyTheme(value);
+                    break;
                 case 'doubleTapSeek':
                     updateSkipLabels();
                     break;
@@ -277,6 +1127,17 @@ window.__firebase_config = JSON.stringify({
             root.style.setProperty('--accent', hex);
             root.style.setProperty('--accent-hover', darkenHexColor(hex, 15));
             root.style.setProperty('--shadow-color', hex);
+        }
+
+        function resolveTheme(t) {
+            if (t === 'auto') {
+                return (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+            }
+            return t === 'light' ? 'light' : 'dark';
+        }
+
+        function applyTheme(t) {
+            document.documentElement.setAttribute('data-theme', resolveTheme(t));
         }
 
         function applyUiScale(pct) {
@@ -302,6 +1163,7 @@ window.__firebase_config = JSON.stringify({
         function applyStartupConfig() {
             applyAccentColor(appConfig.accentColor);
             applyUiScale(appConfig.uiScale);
+            applyTheme(appConfig.theme);
             applyReduceMotion(appConfig.reduceMotion);
             updateSkipLabels();
             if (appConfig.theaterModeDefault) toggleTheaterMode(true);
@@ -506,6 +1368,7 @@ window.__firebase_config = JSON.stringify({
             setVal('config-defaultSortOrder', appConfig.defaultSortOrder);
             setVal('config-accentColor', appConfig.accentColor);
             setVal('config-uiScale', appConfig.uiScale);
+            setVal('config-theme', appConfig.theme);
             setChecked('config-recordHistory', appConfig.recordHistory);
         }
 
@@ -514,6 +1377,7 @@ window.__firebase_config = JSON.stringify({
         let currentUserDiscordId = "";
         let userWatchHistory = [];
         let userWatchLater = [];
+        let userFavorites = [];
         let userResumeTimes = {};
 
         function displayLoginError(msgHTML) {
@@ -635,6 +1499,8 @@ window.__firebase_config = JSON.stringify({
         }
 
         function initApp() {
+            capturePendingLink();
+            injectNewUi();
             lucide.createIcons();
             applyStartupConfig();
             
@@ -748,6 +1614,7 @@ window.__firebase_config = JSON.stringify({
             
             userWatchHistory = getStoredData('history_' + currentUser, []);
             userWatchLater = getStoredData('watchlater_' + currentUser, []);
+            userFavorites = getStoredData('favorites_' + currentUser, []);
             userResumeTimes = getStoredData('resumes_' + currentUser, {});
 
             window.currentUser = currentUser;
@@ -790,13 +1657,16 @@ window.__firebase_config = JSON.stringify({
                     const data = docSnap.data();
                     if (Array.isArray(data.history)) userWatchHistory = data.history;
                     if (Array.isArray(data.watchLater)) userWatchLater = data.watchLater;
+                    if (Array.isArray(data.favorites)) userFavorites = data.favorites;
                     if (data.resumeTimes) userResumeTimes = data.resumeTimes;
                     
                     setStoredData('history_' + currentUser, userWatchHistory);
                     setStoredData('watchlater_' + currentUser, userWatchLater);
+                    setStoredData('favorites_' + currentUser, userFavorites);
                     setStoredData('resumes_' + currentUser, userResumeTimes);
 
                     updateWatchLaterBtnUI();
+                    updateFavoriteBtnUI();
                     renderPlaylist();
                 } else {
                     saveUserDataToCloud();
@@ -808,6 +1678,7 @@ window.__firebase_config = JSON.stringify({
             if (!currentUser) return;
             setStoredData('history_' + currentUser, userWatchHistory);
             setStoredData('watchlater_' + currentUser, userWatchLater);
+            setStoredData('favorites_' + currentUser, userFavorites);
             setStoredData('resumes_' + currentUser, userResumeTimes);
 
             const authUser = window.getAuthUser ? window.getAuthUser() : null;
@@ -819,6 +1690,7 @@ window.__firebase_config = JSON.stringify({
                     username: currentUser,
                     history: userWatchHistory,
                     watchLater: userWatchLater,
+                    favorites: userFavorites,
                     resumeTimes: userResumeTimes,
                     updatedAt: new Date().toISOString()
                 }, { merge: true });
@@ -868,6 +1740,7 @@ window.__firebase_config = JSON.stringify({
             window.currentUserDiscordId = null;
             userWatchHistory = [];
             userWatchLater = [];
+            userFavorites = [];
             userResumeTimes = {};
 
             // 3) 後始末(失敗しても無視)
@@ -1039,6 +1912,165 @@ window.__firebase_config = JSON.stringify({
         function closeWatchLaterModal() {
             document.getElementById('watchLaterModal').classList.add('hidden');
             unlockBodyScroll();
+        }
+
+        function toggleFavorite() {
+            if (!currentUser) return;
+            const index = userFavorites.indexOf(activeId);
+            if (index >= 0) {
+                userFavorites.splice(index, 1);
+                showToast("お気に入りから削除しました", "watchLater");
+            } else {
+                userFavorites.push(activeId);
+                showToast("お気に入りに追加しました", "watchLater");
+            }
+            saveUserDataToCloud();
+            updateFavoriteBtnUI();
+            renderPlaylist();
+        }
+
+        function updateFavoriteBtnUI() {
+            const btn = document.getElementById('favoriteBtn');
+            if (!btn) return;
+            const on = userFavorites.includes(activeId);
+            btn.innerHTML = `<i data-lucide="heart" class="w-5 h-5 text-rose-400 ${on ? 'fill-rose-400' : 'fill-transparent'}"></i>`;
+            lucide.createIcons();
+        }
+
+        function openFavoritesModal() {
+            const container = document.getElementById('favoritesListContainer');
+            container.innerHTML = "";
+            const items = userFavorites.map(id => videos.find(video => video.id === id)).filter(Boolean);
+            if (items.length === 0) {
+                container.innerHTML = `<p class="text-xs text-brandMuted text-center py-8">お気に入りはまだありません</p>`;
+            } else {
+                items.forEach(v => {
+                    const el = document.createElement('div');
+                    el.className = "flex items-center justify-between p-3 bg-brandBg rounded-xl border border-brandBorder";
+                    el.innerHTML = `
+                        <div class="flex items-center gap-3 min-w-0 cursor-pointer flex-grow" onclick="loadMedia(${v.id}); closeFavoritesModal();">
+                            <img src="${v.thumbnail}" class="w-16 h-10 object-contain bg-black rounded border border-brandBorder flex-shrink-0">
+                            <div class="min-w-0">
+                                <p class="text-xs font-bold text-brandText truncate">${v.title}</p>
+                                <p class="text-[10px] text-brandMuted">${v.duration}</p>
+                            </div>
+                        </div>
+                        <button onclick="removeFromFavorites(${v.id}, event)" class="p-2 text-brandMuted hover:text-red-500 transition-colors min-w-[40px] min-h-[40px] flex items-center justify-center">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    `;
+                    container.appendChild(el);
+                });
+            }
+            document.getElementById('favoritesModal').classList.remove('hidden');
+            lockBodyScroll();
+            lucide.createIcons();
+        }
+
+        function removeFromFavorites(id, e) {
+            if (e) e.stopPropagation();
+            if (!currentUser) return;
+            const index = userFavorites.indexOf(id);
+            if (index >= 0) {
+                userFavorites.splice(index, 1);
+                saveUserDataToCloud();
+                openFavoritesModal();
+                updateFavoriteBtnUI();
+                renderPlaylist();
+                showToast("お気に入りから削除しました", "watchLater");
+            }
+        }
+
+        function closeFavoritesModal() {
+            document.getElementById('favoritesModal').classList.add('hidden');
+            unlockBodyScroll();
+        }
+
+        function playRandom() {
+            const pool = videos.filter(v => {
+                if (v.id === activeId) return false;
+                if (!searchQuery) return true;
+                return (v.title || '').toLowerCase().includes(searchQuery)
+                    || (v.desc || '').toLowerCase().includes(searchQuery)
+                    || (v.date || '').includes(searchQuery);
+            });
+            if (pool.length === 0) {
+                showToast("ほかに再生できる動画がありません", "autoNext");
+                return;
+            }
+            const pick = pool[Math.floor(Math.random() * pool.length)];
+            showToast("ランダム再生", "autoNext");
+            loadMedia(pick.id);
+            const box = document.getElementById('videoContainer');
+            if (box && box.scrollIntoView) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        const PENDING_LINK_KEY = 'pending_link';
+        let linkSeek = null;
+        let linkSeekTimer = null;
+        let linkSeekToasted = false;
+
+        function capturePendingLink() {
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const v = parseInt(params.get('v'));
+                if (!Number.isInteger(v) || v <= 0) return;
+                const t = parseFloat(params.get('t'));
+                setStoredData(PENDING_LINK_KEY, { v: v, t: (isFinite(t) && t > 0) ? Math.floor(t) : 0, ts: Date.now() });
+            } catch (e) {}
+        }
+
+        function consumePendingLink() {
+            const p = getStoredData(PENDING_LINK_KEY, null);
+            try { localStorage.removeItem(STORAGE_PREFIX + PENDING_LINK_KEY); } catch (e) {}
+            if (!p || !p.v || (Date.now() - p.ts) > 60 * 60 * 1000) return null;
+            return p;
+        }
+
+        function linkifyTimestamps(line) {
+            return line.replace(/(^|[\s(（\[【「>])(\d{1,2}:\d{2}(?::\d{2})?)(?![\d:])/g, (m, pre, ts) => {
+                const parts = ts.split(':').map(Number);
+                if (parts.slice(1).some(n => n >= 60)) return m;
+                const sec = parts.length === 3 ? parts[0] * 3600 + parts[1] * 60 + parts[2] : parts[0] * 60 + parts[1];
+                return `${pre}<span class="ts-link" data-t="${sec}">${ts}</span>`;
+            });
+        }
+
+        const EXTRA_CSS = `
+            .ts-link { color: var(--accent); font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+            html[data-theme="light"] { --bg-main: #f4f4f5; --bg-surface: #ffffff; --text-main: #18181b; --text-muted: #71717a; --border-color: #d4d4d8; --header-bg: #ffffff; color-scheme: light; }
+        `;
+
+        function injectNewUi() {
+            if (document.getElementById('extraUiStyle')) return;
+
+            const style = document.createElement('style');
+            style.id = 'extraUiStyle';
+            style.textContent = EXTRA_CSS;
+            document.head.appendChild(style);
+
+            if (window.matchMedia) {
+                const mq = window.matchMedia('(prefers-color-scheme: light)');
+                const onChange = () => { if (appConfig.theme === 'auto') applyTheme('auto'); };
+                if (mq.addEventListener) mq.addEventListener('change', onChange);
+                else if (mq.addListener) mq.addListener(onChange);
+            }
+
+            document.addEventListener('click', (e) => {
+                const el = e.target && e.target.closest ? e.target.closest('.ts-link') : null;
+                if (!el) return;
+                e.stopPropagation();
+                const sec = parseInt(el.getAttribute('data-t'), 10);
+                const cur = videos.find(x => x.id === activeId);
+                if (!cur || cur.type === 'image' || cur.images || !player || !isFinite(sec)) return;
+                const d = player.duration;
+                player.currentTime = (isFinite(d) && sec > d) ? Math.max(0, d - 1) : sec;
+                if (player.paused) player.play().catch(() => {});
+                const box = document.getElementById('videoContainer');
+                if (box && box.scrollIntoView) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+
+            lucide.createIcons();
         }
 
         function showShortcutsModal() {
@@ -1340,9 +2372,14 @@ window.__firebase_config = JSON.stringify({
 
 
             // 届くまでは無期限に試行し続ける
+            let missTicks = 0;
             const timer = setInterval(() => {
                 const found = videos.some(v => v.id === activeId);
-                if (!found) return;
+                if (!found) {
+                    missTicks = videos.length > 0 ? missTicks + 1 : 0;
+                    if (missTicks >= 4) { activeId = videos[0].id; linkSeek = null; missTicks = 0; }
+                    return;
+                }
 
                 attemptLoad();
                 hasLoadedInitialMedia = true;
@@ -1364,6 +2401,17 @@ window.__firebase_config = JSON.stringify({
             // この時点ではvideosがまだ空(Firestore読み込み前)のことがあるので、
             // 存在チェックはせず数値として有効なら採用する。実際に存在するかはforceLoadIdOneUntilReady側で判定される。
             activeId = (Number.isInteger(vParam) && vParam > 0) ? vParam : 1;
+            const pending = consumePendingLink();
+            if (pending) {
+                activeId = pending.v;
+                if (pending.t > 0) linkSeek = { id: pending.v, t: pending.t };
+                try {
+                    const u = new URL(window.location.href);
+                    u.searchParams.set('v', pending.v);
+                    u.searchParams.delete('t');
+                    history.replaceState(null, '', u.toString());
+                } catch (e) {}
+            }
 
             forceLoadIdOneUntilReady();
 
@@ -1385,7 +2433,7 @@ window.__firebase_config = JSON.stringify({
                     const matchedTags = line.match(/([#＃][^\s#＃]+)/g);
                     if (matchedTags) return `<span class="hashtag-container-gradient cursor-pointer" onclick="filterByTagText('${matchedTags[0].replace(/[#＃]/g,'')}')">${matchedTags.join(' ')}</span>`;
                 }
-                return line;
+                return linkifyTimestamps(line);
             }).join('<br>');
         }
 
@@ -1477,6 +2525,7 @@ window.__firebase_config = JSON.stringify({
             vDesc.innerHTML = formatHashtags(v.desc);
             renderPlaylist();
             updateWatchLaterBtnUI();
+            updateFavoriteBtnUI();
             if (appConfig.recordHistory) recordHistory(v.id);
 
             const imageViewer = document.getElementById('imageViewer');
@@ -1515,7 +2564,24 @@ window.__firebase_config = JSON.stringify({
                 updateSeekBarUI(0);
 
                 const savedTime = userResumeTimes[v.id] || 0;
-                if (savedTime > 5) {
+                if (linkSeek && linkSeek.id === v.id && linkSeek.t > 0) {
+                    const target = linkSeek.t;
+                    const applySeek = () => {
+                        if (!linkSeek || linkSeek.id !== v.id) return;
+                        const d = player.duration;
+                        player.currentTime = (isFinite(d) && target > d) ? Math.max(0, d - 1) : target;
+                        if (!linkSeekToasted) {
+                            linkSeekToasted = true;
+                            showToast(`共有された位置 (${formatTime(target)}) から`, 'resume');
+                        }
+                        if (!linkSeekTimer) {
+                            linkSeekTimer = setTimeout(() => { linkSeek = null; linkSeekTimer = null; linkSeekToasted = false; }, 1500);
+                        }
+                    };
+                    if (player.readyState >= 1) applySeek();
+                    else player.addEventListener('loadedmetadata', applySeek, { once: true });
+                    startVideoPlayback();
+                } else if (savedTime > 5) {
                     pendingResumeTime = savedTime;
                     document.getElementById('resumeTimeText').textContent = `再生位置: ${formatTime(savedTime)}`;
                     document.getElementById('resumeModal').classList.remove('hidden');
@@ -1556,6 +2622,7 @@ window.__firebase_config = JSON.stringify({
         }
 
         function updateImageViewer() {
+            resetImgZoom();
             const track = document.getElementById('imageTrack');
             track.style.transform = `translateX(-${currentImageIndex * 100}%)`;
             
@@ -1593,18 +2660,147 @@ window.__firebase_config = JSON.stringify({
         let touchStartX = 0;
         let touchEndX = 0;
         
+        let imgZoom = { scale: 1, x: 0, y: 0 };
+
+        function currentZoomImg() {
+            const track = document.getElementById('imageTrack');
+            return track ? track.children[currentImageIndex] : null;
+        }
+
+        function applyImgZoom() {
+            const img = currentZoomImg();
+            if (!img) return;
+            img.style.transformOrigin = 'center center';
+            img.style.transform = imgZoom.scale === 1 ? '' : `translate(${imgZoom.x}px, ${imgZoom.y}px) scale(${imgZoom.scale})`;
+        }
+
+        function resetImgZoom() {
+            const track = document.getElementById('imageTrack');
+            if (track) Array.from(track.children).forEach(img => { img.style.transform = ''; });
+            imgZoom = { scale: 1, x: 0, y: 0 };
+        }
+
+        function clampImgPan() {
+            const viewer = document.getElementById('imageViewer');
+            const mx = viewer.clientWidth * (imgZoom.scale - 1) / 2;
+            const my = viewer.clientHeight * (imgZoom.scale - 1) / 2;
+            imgZoom.x = Math.max(-mx, Math.min(mx, imgZoom.x));
+            imgZoom.y = Math.max(-my, Math.min(my, imgZoom.y));
+        }
+
+        function toggleImgZoomAt(clientX, clientY) {
+            if (imgZoom.scale > 1) {
+                resetImgZoom();
+                return;
+            }
+            const viewer = document.getElementById('imageViewer');
+            const rect = viewer.getBoundingClientRect();
+            const target = 2.5;
+            imgZoom.scale = target;
+            imgZoom.x = (clientX - (rect.left + rect.width / 2)) * (1 - target);
+            imgZoom.y = (clientY - (rect.top + rect.height / 2)) * (1 - target);
+            clampImgPan();
+            applyImgZoom();
+        }
+
         function setupImageSwipeEvents() {
             const viewer = document.getElementById('imageViewer');
+            let mode = null;
+            let startDist = 0, startScale = 1;
+            let lastX = 0, lastY = 0, moved = false;
+            let lastTap = 0, lastTapX = 0, lastTapY = 0;
+            const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+
             viewer.addEventListener('touchstart', (e) => {
-                touchStartX = e.changedTouches[0].screenX;
-            }, {passive: true});
-            
+                if (e.target.closest && e.target.closest('button')) { mode = null; return; }
+                if (e.touches.length === 2) {
+                    mode = 'pinch';
+                    startDist = dist(e.touches);
+                    startScale = imgZoom.scale;
+                    return;
+                }
+                if (e.touches.length === 1) {
+                    const t = e.touches[0];
+                    touchStartX = e.changedTouches[0].screenX;
+                    touchEndX = touchStartX;
+                    lastX = t.clientX; lastY = t.clientY;
+                    moved = false;
+                    mode = imgZoom.scale > 1 ? 'pan' : 'swipe';
+                }
+            }, { passive: true });
+
+            viewer.addEventListener('touchmove', (e) => {
+                if (mode === 'pinch' && e.touches.length === 2) {
+                    e.preventDefault();
+                    imgZoom.scale = Math.max(1, Math.min(5, startScale * dist(e.touches) / startDist));
+                    if (imgZoom.scale === 1) { imgZoom.x = 0; imgZoom.y = 0; }
+                    clampImgPan();
+                    applyImgZoom();
+                    return;
+                }
+                if (mode === 'pan' && e.touches.length === 1) {
+                    e.preventDefault();
+                    const t = e.touches[0];
+                    imgZoom.x += t.clientX - lastX;
+                    imgZoom.y += t.clientY - lastY;
+                    lastX = t.clientX; lastY = t.clientY;
+                    moved = true;
+                    clampImgPan();
+                    applyImgZoom();
+                    return;
+                }
+                if (mode === 'swipe' && e.touches.length === 1) {
+                    touchEndX = e.touches[0].screenX;
+                    if (Math.abs(e.touches[0].clientX - lastX) > 8 || Math.abs(e.touches[0].clientY - lastY) > 8) moved = true;
+                }
+            }, { passive: false });
+
             viewer.addEventListener('touchend', (e) => {
-                touchEndX = e.changedTouches[0].screenX;
-                handleSwipe();
+                if (mode === 'pinch') {
+                    if (e.touches.length === 0) mode = null;
+                    else if (e.touches.length === 1) {
+                        mode = imgZoom.scale > 1 ? 'pan' : null;
+                        lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+                    }
+                    return;
+                }
+                if (e.touches.length > 0 || !mode) return;
+                const t = e.changedTouches[0];
+                if (mode === 'swipe') {
+                    touchEndX = t.screenX;
+                    if (Math.abs(touchStartX - touchEndX) > 40) {
+                        handleSwipe();
+                        mode = null;
+                        return;
+                    }
+                }
+                if (!moved) {
+                    const now = Date.now();
+                    if (now - lastTap < 300 && Math.hypot(t.clientX - lastTapX, t.clientY - lastTapY) < 30) {
+                        toggleImgZoomAt(t.clientX, t.clientY);
+                        lastTap = 0;
+                    } else {
+                        lastTap = now; lastTapX = t.clientX; lastTapY = t.clientY;
+                    }
+                }
+                mode = null;
             });
+
+            viewer.addEventListener('dblclick', (e) => {
+                if (e.target.closest && e.target.closest('button')) return;
+                toggleImgZoomAt(e.clientX, e.clientY);
+            });
+
+            viewer.addEventListener('wheel', (e) => {
+                if (!e.ctrlKey && imgZoom.scale === 1) return;
+                e.preventDefault();
+                imgZoom.scale = Math.max(1, Math.min(5, imgZoom.scale - e.deltaY * 0.01));
+                if (imgZoom.scale === 1) { imgZoom.x = 0; imgZoom.y = 0; }
+                clampImgPan();
+                applyImgZoom();
+            }, { passive: false });
         }
-        
+
         function handleSwipe() {
             const diffX = touchStartX - touchEndX;
             const threshold = 40; 
@@ -1698,7 +2894,18 @@ window.__firebase_config = JSON.stringify({
         }
 
         async function shareVideo() {
-            const finalShareUrl = SHARE_CONFIG.url;
+            let finalShareUrl = SHARE_CONFIG.url || (window.location.origin + window.location.pathname);
+            const cur = videos.find(item => item.id === activeId);
+            if (cur) {
+                try {
+                    const u = new URL(finalShareUrl, window.location.href);
+                    u.searchParams.set('v', cur.id);
+                    const isImg = cur.type === 'image' || cur.images;
+                    const t = (!isImg && player) ? Math.floor(player.currentTime || 0) : 0;
+                    if (t >= 3) u.searchParams.set('t', t); else u.searchParams.delete('t');
+                    finalShareUrl = u.toString();
+                } catch (e) {}
+            }
             if (navigator.share) {
                 try {
                     await navigator.share({ title: SHARE_CONFIG.title, text: SHARE_CONFIG.text, url: finalShareUrl });
@@ -1871,6 +3078,7 @@ window.__firebase_config = JSON.stringify({
                 card.innerHTML = `
                     <div class="relative w-28 lg:w-32 h-16 bg-black rounded-xl overflow-hidden flex-shrink-0 border border-brandBorder">
                         <img class="absolute inset-0 w-full h-full object-contain transition-transform group-hover:scale-105" src="${v.thumbnail}">
+                        ${userFavorites.includes(v.id) ? '<i data-lucide="heart" class="absolute top-1 left-1 w-3.5 h-3.5 text-rose-400 fill-rose-400 z-10"></i>' : ''}
                         <span class="absolute bottom-1 right-1 bg-black/80 text-[9px] px-1 rounded font-mono text-white z-10 flex items-center gap-1">
                             ${isImage ? '<i data-lucide="image" class="w-2.5 h-2.5"></i>' : ''}${v.duration}
                         </span>
