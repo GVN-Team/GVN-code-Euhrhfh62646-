@@ -74,7 +74,7 @@ const APP_LAYOUT_HTML = String.raw`
                         <a href="javascript:void(0)" onclick="closeUserMenu(); openMyPage();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="layout-dashboard" class="w-4 h-4 text-brandMuted"></i> マイページ</a>
                         <a href="javascript:void(0)" onclick="closeUserMenu(); openHistoryModal();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="history" class="w-4 h-4 text-brandMuted"></i> 視聴履歴</a>
                         <a href="javascript:void(0)" onclick="closeUserMenu(); openFavoritesModal();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="heart" class="w-4 h-4 text-brandMuted"></i> お気に入り</a>
-                        <a href="javascript:void(0)" onclick="closeUserMenu(); openSavesModal();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="bookmark" class="w-4 h-4 text-brandMuted"></i> 保存した動画</a>
+                        <a href="javascript:void(0)" onclick="closeUserMenu(); openSavesModal();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="bookmark" class="w-4 h-4 text-brandMuted"></i> あとで見る</a>
                         <a href="javascript:void(0)" onclick="closeUserMenu(); openNotificationSettingsModal();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="bell" class="w-4 h-4 text-brandMuted"></i> 通知設定</a>
                         <a href="javascript:void(0)" onclick="closeUserMenu(); showShortcutsModal();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="keyboard" class="w-4 h-4 text-brandMuted"></i> ショートカット</a>
                         
@@ -186,8 +186,8 @@ const APP_LAYOUT_HTML = String.raw`
                             <button id="favoriteBtn" onclick="toggleFavorite()" title="お気に入り" class="p-3 bg-brandBg border border-brandBorder hover:border-rose-400 active:scale-95 transition-all rounded-full text-brandText shadow-md flex items-center justify-center min-w-[44px] min-h-[44px]">
                                 <i data-lucide="heart" class="w-5 h-5 text-rose-400 fill-transparent"></i>
                             </button>
-                            <button id="saveBtn" onclick="toggleSave()" title="保存(アカウントに永久保存)" class="p-3 bg-brandBg border border-brandBorder hover:border-brandAccent active:scale-95 transition-all rounded-full text-brandText shadow-md flex items-center justify-center min-w-[44px] min-h-[44px]">
-                                <i data-lucide="bookmark" class="w-5 h-5 text-brandAccent fill-transparent"></i>
+                            <button id="saveBtn" onclick="toggleSave()" title="あとで見る" class="p-3 bg-brandBg border border-brandBorder hover:border-amber-400 active:scale-95 transition-all rounded-full text-brandText shadow-md flex items-center justify-center min-w-[44px] min-h-[44px]">
+                                <i data-lucide="bookmark" class="w-5 h-5 text-amber-400 fill-transparent"></i>
                             </button>
                             <button onclick="shareVideo()" class="flex items-center gap-1.5 px-4 py-3 bg-brandBg border border-brandBorder hover:border-brandAccent active:scale-95 transition-all rounded-full text-xs font-bold text-brandText shadow-md min-h-[44px]">
                                 <i data-lucide="share-2" class="w-4 h-4 text-blue-400"></i><span>共有する</span>
@@ -529,9 +529,9 @@ const APP_LAYOUT_HTML = String.raw`
                     </label>
                 </div>
 
-                <div class="notif-item flex items-center justify-between p-3 bg-brandBg rounded-xl border border-brandBorder" data-title="「お気に入り・保存」追加・削除" data-desc="リスト追加、削除操作の完了通知">
+                <div class="notif-item flex items-center justify-between p-3 bg-brandBg rounded-xl border border-brandBorder" data-title="「お気に入り・あとで見る」追加・削除" data-desc="リスト追加、削除操作の完了通知">
                     <div>
-                        <p class="text-xs font-bold text-brandText">「お気に入り・保存」追加・削除</p>
+                        <p class="text-xs font-bold text-brandText">「お気に入り・あとで見る」追加・削除</p>
                         <p class="text-[10px] text-brandMuted">リスト追加、削除操作の完了通知</p>
                     </div>
                     <label class="flex items-center cursor-pointer">
@@ -729,7 +729,7 @@ const APP_LAYOUT_HTML = String.raw`
         <div id="savesModal" class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 hidden">
         <div class="bg-brandSurface border border-brandBorder rounded-theme max-w-md w-full max-h-[85vh] flex flex-col p-6 shadow-2xl">
             <div class="flex justify-between items-center pb-3 border-b border-brandBorder flex-shrink-0">
-                <h3 class="text-lg font-bold text-brandText flex items-center gap-2"><i data-lucide="bookmark" class="text-brandAccent"></i><span>保存した動画</span></h3>
+                <h3 class="text-lg font-bold text-brandText flex items-center gap-2"><i data-lucide="bookmark" class="text-amber-400"></i><span>あとで見る</span></h3>
                 <button onclick="closeSavesModal()" class="text-brandMuted hover:text-brandText transition-colors p-2"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
             <div id="savesListContainer" class="overflow-y-auto flex-grow py-4 space-y-3 scrollbar-thin"></div>
@@ -1278,7 +1278,7 @@ window.__firebase_config = JSON.stringify({
                             </div>
                             <div class="bg-brandSurface border border-brandBorder rounded-xl p-4 text-center">
                                 <p class="text-2xl sm:text-3xl font-black text-brandAccent">${savedCount}</p>
-                                <p class="text-[10px] sm:text-xs text-brandMuted font-bold mt-1">保存</p>
+                                <p class="text-[10px] sm:text-xs text-brandMuted font-bold mt-1">あとで見る</p>
                             </div>
                             <div class="bg-brandSurface border border-brandBorder rounded-xl p-4 text-center">
                                 <p class="text-2xl sm:text-3xl font-black text-brandAccent">${totalCount}</p>
@@ -1294,7 +1294,7 @@ window.__firebase_config = JSON.stringify({
                         <h3 class="text-xs font-bold text-brandMuted mb-3 flex items-center gap-1.5"><i data-lucide="zap" class="w-3.5 h-3.5"></i> クイックアクション</h3>
                         <div class="grid grid-cols-2 gap-2.5 mb-2">
                             <button onclick="closeMyPage(); openHistoryModal();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandSurface border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-3 transition"><i data-lucide="history" class="w-4 h-4 text-brandMuted"></i> 視聴履歴</button>
-                            <button onclick="closeMyPage(); openSavesModal();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandSurface border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-3 transition"><i data-lucide="bookmark" class="w-4 h-4 text-brandMuted"></i> 保存した動画</button>
+                            <button onclick="closeMyPage(); openSavesModal();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandSurface border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-3 transition"><i data-lucide="bookmark" class="w-4 h-4 text-brandMuted"></i> あとで見る</button>
                             <button onclick="closeMyPage(); openSettings();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandSurface border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-3 transition"><i data-lucide="settings" class="w-4 h-4 text-brandMuted"></i> 設定</button>
                             <button onclick="closeMyPage(); openNotificationSettingsModal();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandSurface border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-3 transition"><i data-lucide="bell" class="w-4 h-4 text-brandMuted"></i> 通知設定</button>
                             <button onclick="closeMyPage(); showShortcutsModal();" class="flex items-center gap-2 text-xs font-bold text-brandText bg-brandSurface border border-brandBorder hover:border-brandAccent rounded-lg px-3 py-3 transition"><i data-lucide="keyboard" class="w-4 h-4 text-brandMuted"></i> ショートカット</button>
@@ -1337,7 +1337,7 @@ window.__firebase_config = JSON.stringify({
         }
 
         function resetAllSettingsAndData() {
-            if (!confirm("設定と保存データ(履歴・お気に入り・視聴位置・設定。アカウントの保存は消えません)をすべて初期化します。よろしいですか？")) return;
+            if (!confirm("設定とデータ(履歴・お気に入り・視聴位置・設定。アカウントの「あとで見る」は消えません)をすべて初期化します。よろしいですか？")) return;
             const keysToRemove = [];
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
@@ -2019,14 +2019,14 @@ window.__firebase_config = JSON.stringify({
         async function toggleSave() {
             if (!currentUser) return;
             if (!currentAccountKey()) {
-                showToast("保存を使うには、一度ログアウトしてもう一度ログインしてください", "system");
+                showToast("「あとで見る」を使うには、一度ログアウトしてもう一度ログインしてください", "system");
                 return;
             }
             if (savePending) return;
             if (!savesReady) {
                 await loadSavesForAccount();
                 if (!savesReady) {
-                    showToast("保存サーバーに接続できませんでした", "system");
+                    showToast("サーバーに接続できませんでした", "system");
                     return;
                 }
             }
@@ -2038,12 +2038,12 @@ window.__firebase_config = JSON.stringify({
             renderPlaylist();
             try {
                 await pushSavedToCloud(userSaved);
-                showToast(index >= 0 ? "保存を解除しました" : "保存しました", "watchLater");
+                showToast(index >= 0 ? "「あとで見る」から削除しました" : "「あとで見る」に追加しました", "watchLater");
             } catch (e) {
                 userSaved = prev;
                 updateSaveBtnUI();
                 renderPlaylist();
-                showToast("保存に失敗しました (" + (e && e.message ? e.message : '通信エラー') + ")", "system");
+                showToast("「あとで見る」の更新に失敗しました (" + (e && e.message ? e.message : '通信エラー') + ")", "system");
             } finally {
                 savePending = false;
             }
@@ -2053,7 +2053,7 @@ window.__firebase_config = JSON.stringify({
             const btn = document.getElementById('saveBtn');
             if (!btn) return;
             const on = userSaved.includes(activeId);
-            btn.innerHTML = `<i data-lucide="bookmark" class="w-5 h-5 text-brandAccent ${on ? 'fill-brandAccent' : 'fill-transparent'}"></i>`;
+            btn.innerHTML = `<i data-lucide="bookmark" class="w-5 h-5 text-amber-400 ${on ? 'fill-amber-400' : 'fill-transparent'}"></i>`;
             lucide.createIcons();
         }
 
@@ -2062,7 +2062,7 @@ window.__firebase_config = JSON.stringify({
             document.getElementById('savesModal').classList.remove('hidden');
             lockBodyScroll();
             if (!currentAccountKey()) {
-                container.innerHTML = `<p class="text-xs text-brandMuted text-center py-8">保存を使うには、一度ログアウトしてもう一度ログインしてください</p>`;
+                container.innerHTML = `<p class="text-xs text-brandMuted text-center py-8">「あとで見る」を使うには、一度ログアウトしてもう一度ログインしてください</p>`;
                 return;
             }
             if (!savesReady) {
@@ -2077,12 +2077,12 @@ window.__firebase_config = JSON.stringify({
             if (!container) return;
             container.innerHTML = "";
             if (!savesReady) {
-                container.innerHTML = `<p class="text-xs text-brandMuted text-center py-8">保存サーバーに接続できませんでした</p>`;
+                container.innerHTML = `<p class="text-xs text-brandMuted text-center py-8">サーバーに接続できませんでした</p>`;
                 return;
             }
             const items = userSaved.map(id => videos.find(video => video.id === id)).filter(Boolean);
             if (items.length === 0) {
-                container.innerHTML = `<p class="text-xs text-brandMuted text-center py-8">保存した動画はまだありません</p>`;
+                container.innerHTML = `<p class="text-xs text-brandMuted text-center py-8">「あとで見る」リストは空です</p>`;
             } else {
                 items.forEach(v => {
                     const el = document.createElement('div');
@@ -2118,13 +2118,13 @@ window.__firebase_config = JSON.stringify({
             renderPlaylist();
             try {
                 await pushSavedToCloud(userSaved);
-                showToast("保存を解除しました", "watchLater");
+                showToast("「あとで見る」から削除しました", "watchLater");
             } catch (err) {
                 userSaved = prev;
                 renderSavesList();
                 updateSaveBtnUI();
                 renderPlaylist();
-                showToast("保存の解除に失敗しました", "system");
+                showToast("「あとで見る」からの削除に失敗しました", "system");
             } finally {
                 savePending = false;
             }
@@ -2186,7 +2186,7 @@ window.__firebase_config = JSON.stringify({
         }
 
         const EXTRA_CSS = `
-            .gauge { position: relative; width: min(260px, 70vw); height: 4px; border-radius: 999px; background: var(--border-color); overflow: hidden; }
+            .gauge { position: relative; width: min(130px, 40vw); height: 3px; border-radius: 999px; background: var(--border-color); overflow: hidden; }
             .gauge-bar { position: absolute; top: 0; left: 0; height: 100%; width: 30%; background: linear-gradient(90deg, rgba(234,88,12,0) 0%, #ea580c 35%, #ea580c 65%, rgba(234,88,12,0) 100%); animation: gauge-slide 1.4s ease-in-out infinite alternate; }
             @keyframes gauge-slide { from { transform: translateX(0); } to { transform: translateX(233.34%); } }
             .ts-link { color: var(--accent); font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
@@ -3234,7 +3234,7 @@ window.__firebase_config = JSON.stringify({
                     <div class="relative w-28 lg:w-32 h-16 bg-black rounded-xl overflow-hidden flex-shrink-0 border border-brandBorder">
                         <img class="absolute inset-0 w-full h-full object-contain transition-transform group-hover:scale-105" src="${v.thumbnail}">
                         ${userFavorites.includes(v.id) ? '<i data-lucide="heart" class="absolute top-1 left-1 w-3.5 h-3.5 text-rose-400 fill-rose-400 z-10"></i>' : ''}
-                        ${userSaved.includes(v.id) ? '<i data-lucide="bookmark" class="absolute top-1 right-1 w-3.5 h-3.5 text-brandAccent fill-brandAccent z-10"></i>' : ''}
+                        ${userSaved.includes(v.id) ? '<i data-lucide="bookmark" class="absolute top-1 right-1 w-3.5 h-3.5 text-amber-400 fill-amber-400 z-10"></i>' : ''}
                         <span class="absolute bottom-1 right-1 bg-black/80 text-[9px] px-1 rounded font-mono text-white z-10 flex items-center gap-1">
                             ${isImage ? '<i data-lucide="image" class="w-2.5 h-2.5"></i>' : ''}${v.duration}
                         </span>
