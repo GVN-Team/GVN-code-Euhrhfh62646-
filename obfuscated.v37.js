@@ -31,7 +31,7 @@ const APP_LAYOUT_HTML = String.raw`
             </form>
 
             <div id="loadingArea" class="hidden flex-col items-center justify-center mt-6 pt-4">
-                <div class="login-spinner rounded-full h-8 w-8 border-4 border-brandAccent border-t-transparent mb-4"></div>
+                <div class="gauge mb-4"><div class="gauge-bar"></div></div>
                                 <div id="loadingTextContainer" class="flex items-center justify-center text-brandAccent text-xs font-bold tracking-wide font-mono h-6 text-center w-full">
                     <span id="loadingMsg">サーバー状況を確認しています</span>
                     <span id="loadingDots" class="w-4 text-left inline-block"></span>
@@ -75,6 +75,7 @@ const APP_LAYOUT_HTML = String.raw`
                         <a href="javascript:void(0)" onclick="closeUserMenu(); openHistoryModal();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="history" class="w-4 h-4 text-brandMuted"></i> 視聴履歴</a>
                         <a href="javascript:void(0)" onclick="closeUserMenu(); openWatchLaterModal();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="bookmark" class="w-4 h-4 text-brandMuted"></i> あとで見る</a>
                         <a href="javascript:void(0)" onclick="closeUserMenu(); openFavoritesModal();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="heart" class="w-4 h-4 text-brandMuted"></i> お気に入り</a>
+                        <a href="javascript:void(0)" onclick="closeUserMenu(); openSavesModal();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="bookmark" class="w-4 h-4 text-brandMuted"></i> 保存した動画</a>
                         <a href="javascript:void(0)" onclick="closeUserMenu(); openNotificationSettingsModal();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="bell" class="w-4 h-4 text-brandMuted"></i> 通知設定</a>
                         <a href="javascript:void(0)" onclick="closeUserMenu(); showShortcutsModal();" class="block px-4 py-3 text-xs font-bold text-brandText hover:bg-brandBg transition-colors flex items-center gap-2.5"><i data-lucide="keyboard" class="w-4 h-4 text-brandMuted"></i> ショートカット</a>
                         
@@ -185,6 +186,9 @@ const APP_LAYOUT_HTML = String.raw`
                         <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                             <button id="favoriteBtn" onclick="toggleFavorite()" title="お気に入り" class="p-3 bg-brandBg border border-brandBorder hover:border-rose-400 active:scale-95 transition-all rounded-full text-brandText shadow-md flex items-center justify-center min-w-[44px] min-h-[44px]">
                                 <i data-lucide="heart" class="w-5 h-5 text-rose-400 fill-transparent"></i>
+                            </button>
+                            <button id="saveBtn" onclick="toggleSave()" title="保存(アカウントに永久保存)" class="p-3 bg-brandBg border border-brandBorder hover:border-brandAccent active:scale-95 transition-all rounded-full text-brandText shadow-md flex items-center justify-center min-w-[44px] min-h-[44px]">
+                                <i data-lucide="bookmark" class="w-5 h-5 text-brandAccent fill-transparent"></i>
                             </button>
                             <button id="watchLaterBtn" onclick="toggleWatchLater()" title="あとで見る" class="p-3 bg-brandBg border border-brandBorder hover:border-amber-400 active:scale-95 transition-all rounded-full text-brandText shadow-md flex items-center justify-center min-w-[44px] min-h-[44px]">
                                 <i data-lucide="bookmark" id="watchLaterIcon" class="w-5 h-5 text-amber-400 fill-transparent"></i>
@@ -735,6 +739,19 @@ const APP_LAYOUT_HTML = String.raw`
             <div id="favoritesListContainer" class="overflow-y-auto flex-grow py-4 space-y-3 scrollbar-thin"></div>
             <div class="pt-3 border-t border-brandBorder flex-shrink-0">
                 <button onclick="closeFavoritesModal()" class="w-full py-3 bg-brandBg border border-brandBorder hover:border-brandAccent text-brandText rounded-xl text-xs font-bold transition-all min-h-[44px]">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+        <div id="savesModal" class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 hidden">
+        <div class="bg-brandSurface border border-brandBorder rounded-theme max-w-md w-full max-h-[85vh] flex flex-col p-6 shadow-2xl">
+            <div class="flex justify-between items-center pb-3 border-b border-brandBorder flex-shrink-0">
+                <h3 class="text-lg font-bold text-brandText flex items-center gap-2"><i data-lucide="bookmark" class="text-brandAccent"></i><span>保存した動画</span></h3>
+                <button onclick="closeSavesModal()" class="text-brandMuted hover:text-brandText transition-colors p-2"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div id="savesListContainer" class="overflow-y-auto flex-grow py-4 space-y-3 scrollbar-thin"></div>
+            <div class="pt-3 border-t border-brandBorder flex-shrink-0">
+                <button onclick="closeSavesModal()" class="w-full py-3 bg-brandBg border border-brandBorder hover:border-brandAccent text-brandText rounded-xl text-xs font-bold transition-all min-h-[44px]">閉じる</button>
             </div>
         </div>
     </div>
@@ -1489,6 +1506,7 @@ window.__firebase_config = JSON.stringify({
                     setStoredData('session_token', token);
                     setStoredData('session_discord_id', userData.id || '');
                     setStoredData('session_token_checked_at', Date.now());
+                    if (userData.id) setStoredData('session_account_key', 'dc_' + userData.id);
                     applyLoginState(discordUsername, avatarUrl, userData.id || '');
                 } else {
                     displayLoginError(`ロールを所持していません<br><a href="${DISCORD_CONFIG["invite-url"]}" target="_blank" class="underline font-bold text-amber-400">${DISCORD_CONFIG["invite-url"]}</a> でロールを購入してください`);
@@ -1591,6 +1609,9 @@ window.__firebase_config = JSON.stringify({
                 clearInterval(dotInterval);
 
                 if (data && data.success) {
+                    try {
+                        setStoredData('session_account_key', await accountKeyFromCredentials(data.username || userInp.value, passInp.value));
+                    } catch (e) {}
                     setStoredData('session_user', data.username);
                     setStoredData('session_avatar', "");
                     applyLoginState(data.username, "");
@@ -1642,6 +1663,7 @@ window.__firebase_config = JSON.stringify({
             mainContent.classList.add('flex');
             initPlayer();
             initVideosFromFirestore();
+            loadSavesForAccount();
         }
 
         async function syncUserDataFromCloud() {
@@ -1657,7 +1679,6 @@ window.__firebase_config = JSON.stringify({
                     const data = docSnap.data();
                     if (Array.isArray(data.history)) userWatchHistory = data.history;
                     if (Array.isArray(data.watchLater)) userWatchLater = data.watchLater;
-                    if (Array.isArray(data.favorites)) userFavorites = data.favorites;
                     if (data.resumeTimes) userResumeTimes = data.resumeTimes;
                     
                     setStoredData('history_' + currentUser, userWatchHistory);
@@ -1690,7 +1711,6 @@ window.__firebase_config = JSON.stringify({
                     username: currentUser,
                     history: userWatchHistory,
                     watchLater: userWatchLater,
-                    favorites: userFavorites,
                     resumeTimes: userResumeTimes,
                     updatedAt: new Date().toISOString()
                 }, { merge: true });
@@ -1731,6 +1751,7 @@ window.__firebase_config = JSON.stringify({
                 localStorage.removeItem(STORAGE_PREFIX + 'session_token');
                 localStorage.removeItem(STORAGE_PREFIX + 'session_token_checked_at');
                 localStorage.removeItem(STORAGE_PREFIX + 'session_discord_id');
+                localStorage.removeItem(STORAGE_PREFIX + 'session_account_key');
             } catch (e) {}
 
             currentUser = null;
@@ -1741,6 +1762,8 @@ window.__firebase_config = JSON.stringify({
             userWatchHistory = [];
             userWatchLater = [];
             userFavorites = [];
+            userSaved = [];
+            savesReady = false;
             userResumeTimes = {};
 
             // 3) 後始末(失敗しても無視)
@@ -1924,7 +1947,7 @@ window.__firebase_config = JSON.stringify({
                 userFavorites.push(activeId);
                 showToast("お気に入りに追加しました", "watchLater");
             }
-            saveUserDataToCloud();
+            setStoredData('favorites_' + currentUser, userFavorites);
             updateFavoriteBtnUI();
             renderPlaylist();
         }
@@ -1973,7 +1996,7 @@ window.__firebase_config = JSON.stringify({
             const index = userFavorites.indexOf(id);
             if (index >= 0) {
                 userFavorites.splice(index, 1);
-                saveUserDataToCloud();
+                setStoredData('favorites_' + currentUser, userFavorites);
                 openFavoritesModal();
                 updateFavoriteBtnUI();
                 renderPlaylist();
@@ -1983,6 +2006,221 @@ window.__firebase_config = JSON.stringify({
 
         function closeFavoritesModal() {
             document.getElementById('favoritesModal').classList.add('hidden');
+            unlockBodyScroll();
+        }
+
+        const SAVES_PROJECT_ID = 'likes-and-saves';
+        const SAVES_API_KEY = 'AIzaSyDPxlr5-fCoWrHrwk61DmzW-iYmCPnEKHk';
+        const SAVES_BASE = 'https://firestore.googleapis.com/v1/projects/' + SAVES_PROJECT_ID + '/databases/(default)/documents/userSaves';
+        let userSaved = [];
+        let savesReady = false;
+        let savePending = false;
+
+        async function sha256Hex(text) {
+            try {
+                if (window.crypto && window.crypto.subtle) {
+                    const buf = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+                    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+                }
+            } catch (e) {}
+            let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+            for (let i = 0; i < text.length; i++) {
+                const ch = text.charCodeAt(i);
+                h1 = Math.imul(h1 ^ ch, 2654435761);
+                h2 = Math.imul(h2 ^ ch, 1597334677);
+            }
+            h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+            h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+            return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');
+        }
+
+        async function accountKeyFromCredentials(username, password) {
+            return 'pw_' + await sha256Hex(username + '\n' + password);
+        }
+
+        function currentAccountKey() {
+            const k = getStoredData('session_account_key', '');
+            if (k) return k;
+            if (currentUserDiscordId) return 'dc_' + currentUserDiscordId;
+            return '';
+        }
+
+        function savesDocId() {
+            const k = currentAccountKey();
+            return k ? (window.APP_UNIQUE_ID + '__' + k) : '';
+        }
+
+        async function savesFetch(url, options) {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 12000);
+            try {
+                return await fetch(url, Object.assign({}, options || {}, { signal: ctrl.signal }));
+            } finally {
+                clearTimeout(timer);
+            }
+        }
+
+        async function fetchSavedFromCloud() {
+            const id = savesDocId();
+            if (!id) return null;
+            const res = await savesFetch(SAVES_BASE + '/' + encodeURIComponent(id) + '?key=' + SAVES_API_KEY);
+            if (res.status === 404) return [];
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const json = await res.json();
+            const vals = (json.fields && json.fields.saved && json.fields.saved.arrayValue && json.fields.saved.arrayValue.values) || [];
+            return vals.map(v => parseInt(v.integerValue, 10)).filter(n => Number.isInteger(n));
+        }
+
+        async function pushSavedToCloud(list) {
+            const id = savesDocId();
+            if (!id) throw new Error('アカウント未確認');
+            const body = {
+                fields: {
+                    saved: { arrayValue: { values: list.map(n => ({ integerValue: String(n) })) } },
+                    updatedAt: { timestampValue: new Date().toISOString() }
+                }
+            };
+            const res = await savesFetch(
+                SAVES_BASE + '/' + encodeURIComponent(id) + '?updateMask.fieldPaths=saved&updateMask.fieldPaths=updatedAt&key=' + SAVES_API_KEY,
+                { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+            );
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+        }
+
+        async function loadSavesForAccount() {
+            userSaved = [];
+            savesReady = false;
+            updateSaveBtnUI();
+            if (!currentAccountKey()) return;
+            const user = currentUser;
+            try {
+                const list = await fetchSavedFromCloud();
+                if (currentUser !== user) return;
+                userSaved = list || [];
+                savesReady = true;
+            } catch (e) {
+                savesReady = false;
+            }
+            updateSaveBtnUI();
+            renderPlaylist();
+        }
+
+        async function toggleSave() {
+            if (!currentUser) return;
+            if (!currentAccountKey()) {
+                showToast("保存を使うには、一度ログアウトしてもう一度ログインしてください", "system");
+                return;
+            }
+            if (savePending) return;
+            if (!savesReady) {
+                await loadSavesForAccount();
+                if (!savesReady) {
+                    showToast("保存サーバーに接続できませんでした", "system");
+                    return;
+                }
+            }
+            savePending = true;
+            const prev = userSaved.slice();
+            const index = userSaved.indexOf(activeId);
+            if (index >= 0) userSaved.splice(index, 1); else userSaved.push(activeId);
+            updateSaveBtnUI();
+            renderPlaylist();
+            try {
+                await pushSavedToCloud(userSaved);
+                showToast(index >= 0 ? "保存を解除しました" : "保存しました", "watchLater");
+            } catch (e) {
+                userSaved = prev;
+                updateSaveBtnUI();
+                renderPlaylist();
+                showToast("保存に失敗しました (" + (e && e.message ? e.message : '通信エラー') + ")", "system");
+            } finally {
+                savePending = false;
+            }
+        }
+
+        function updateSaveBtnUI() {
+            const btn = document.getElementById('saveBtn');
+            if (!btn) return;
+            const on = userSaved.includes(activeId);
+            btn.innerHTML = `<i data-lucide="bookmark" class="w-5 h-5 text-brandAccent ${on ? 'fill-brandAccent' : 'fill-transparent'}"></i>`;
+            lucide.createIcons();
+        }
+
+        async function openSavesModal() {
+            const container = document.getElementById('savesListContainer');
+            document.getElementById('savesModal').classList.remove('hidden');
+            lockBodyScroll();
+            if (!currentAccountKey()) {
+                container.innerHTML = `<p class="text-xs text-brandMuted text-center py-8">保存を使うには、一度ログアウトしてもう一度ログインしてください</p>`;
+                return;
+            }
+            if (!savesReady) {
+                container.innerHTML = `<p class="text-xs text-brandMuted text-center py-8">読み込み中</p>`;
+                await loadSavesForAccount();
+            }
+            renderSavesList();
+        }
+
+        function renderSavesList() {
+            const container = document.getElementById('savesListContainer');
+            if (!container) return;
+            container.innerHTML = "";
+            if (!savesReady) {
+                container.innerHTML = `<p class="text-xs text-brandMuted text-center py-8">保存サーバーに接続できませんでした</p>`;
+                return;
+            }
+            const items = userSaved.map(id => videos.find(video => video.id === id)).filter(Boolean);
+            if (items.length === 0) {
+                container.innerHTML = `<p class="text-xs text-brandMuted text-center py-8">保存した動画はまだありません</p>`;
+            } else {
+                items.forEach(v => {
+                    const el = document.createElement('div');
+                    el.className = "flex items-center justify-between p-3 bg-brandBg rounded-xl border border-brandBorder";
+                    el.innerHTML = `
+                        <div class="flex items-center gap-3 min-w-0 cursor-pointer flex-grow" onclick="loadMedia(${v.id}); closeSavesModal();">
+                            <img src="${v.thumbnail}" class="w-16 h-10 object-contain bg-black rounded border border-brandBorder flex-shrink-0">
+                            <div class="min-w-0">
+                                <p class="text-xs font-bold text-brandText truncate">${v.title}</p>
+                                <p class="text-[10px] text-brandMuted">${v.duration}</p>
+                            </div>
+                        </div>
+                        <button onclick="removeFromSaves(${v.id}, event)" class="p-2 text-brandMuted hover:text-red-500 transition-colors min-w-[40px] min-h-[40px] flex items-center justify-center">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    `;
+                    container.appendChild(el);
+                });
+            }
+            lucide.createIcons();
+        }
+
+        async function removeFromSaves(id, e) {
+            if (e) e.stopPropagation();
+            if (!savesReady || savePending) return;
+            const index = userSaved.indexOf(id);
+            if (index < 0) return;
+            savePending = true;
+            const prev = userSaved.slice();
+            userSaved.splice(index, 1);
+            renderSavesList();
+            updateSaveBtnUI();
+            renderPlaylist();
+            try {
+                await pushSavedToCloud(userSaved);
+                showToast("保存を解除しました", "watchLater");
+            } catch (err) {
+                userSaved = prev;
+                renderSavesList();
+                updateSaveBtnUI();
+                renderPlaylist();
+                showToast("保存の解除に失敗しました", "system");
+            } finally {
+                savePending = false;
+            }
+        }
+
+        function closeSavesModal() {
+            document.getElementById('savesModal').classList.add('hidden');
             unlockBodyScroll();
         }
 
@@ -2037,6 +2275,9 @@ window.__firebase_config = JSON.stringify({
         }
 
         const EXTRA_CSS = `
+            .gauge { position: relative; width: min(260px, 70vw); height: 4px; border-radius: 999px; background: var(--border-color); overflow: hidden; }
+            .gauge-bar { position: absolute; top: 0; left: 0; height: 100%; width: 30%; background: linear-gradient(90deg, rgba(234,88,12,0) 0%, #ea580c 35%, #ea580c 65%, rgba(234,88,12,0) 100%); animation: gauge-slide 1.4s ease-in-out infinite alternate; }
+            @keyframes gauge-slide { from { transform: translateX(0); } to { transform: translateX(233.34%); } }
             .ts-link { color: var(--accent); font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
             html[data-theme="light"] { --bg-main: #f4f4f5; --bg-surface: #ffffff; --text-main: #18181b; --text-muted: #71717a; --border-color: #d4d4d8; --header-bg: #ffffff; color-scheme: light; }
         `;
@@ -2526,6 +2767,7 @@ window.__firebase_config = JSON.stringify({
             renderPlaylist();
             updateWatchLaterBtnUI();
             updateFavoriteBtnUI();
+            updateSaveBtnUI();
             if (appConfig.recordHistory) recordHistory(v.id);
 
             const imageViewer = document.getElementById('imageViewer');
@@ -2708,10 +2950,11 @@ window.__firebase_config = JSON.stringify({
             let mode = null;
             let startDist = 0, startScale = 1;
             let lastX = 0, lastY = 0, moved = false;
-            let lastTap = 0, lastTapX = 0, lastTapY = 0;
+            let lastTap = 0, lastTapX = 0, lastTapY = 0, lastTouchAt = 0;
             const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
 
             viewer.addEventListener('touchstart', (e) => {
+                lastTouchAt = Date.now();
                 if (e.target.closest && e.target.closest('button')) { mode = null; return; }
                 if (e.touches.length === 2) {
                     mode = 'pinch';
@@ -2721,7 +2964,7 @@ window.__firebase_config = JSON.stringify({
                 }
                 if (e.touches.length === 1) {
                     const t = e.touches[0];
-                    touchStartX = e.changedTouches[0].screenX;
+                    touchStartX = t.clientX;
                     touchEndX = touchStartX;
                     lastX = t.clientX; lastY = t.clientY;
                     moved = false;
@@ -2750,7 +2993,7 @@ window.__firebase_config = JSON.stringify({
                     return;
                 }
                 if (mode === 'swipe' && e.touches.length === 1) {
-                    touchEndX = e.touches[0].screenX;
+                    touchEndX = e.touches[0].clientX;
                     if (Math.abs(e.touches[0].clientX - lastX) > 8 || Math.abs(e.touches[0].clientY - lastY) > 8) moved = true;
                 }
             }, { passive: false });
@@ -2767,7 +3010,7 @@ window.__firebase_config = JSON.stringify({
                 if (e.touches.length > 0 || !mode) return;
                 const t = e.changedTouches[0];
                 if (mode === 'swipe') {
-                    touchEndX = t.screenX;
+                    touchEndX = t.clientX;
                     if (Math.abs(touchStartX - touchEndX) > 40) {
                         handleSwipe();
                         mode = null;
@@ -2777,6 +3020,7 @@ window.__firebase_config = JSON.stringify({
                 if (!moved) {
                     const now = Date.now();
                     if (now - lastTap < 300 && Math.hypot(t.clientX - lastTapX, t.clientY - lastTapY) < 30) {
+                        if (e.cancelable) e.preventDefault();
                         toggleImgZoomAt(t.clientX, t.clientY);
                         lastTap = 0;
                     } else {
@@ -2787,6 +3031,7 @@ window.__firebase_config = JSON.stringify({
             });
 
             viewer.addEventListener('dblclick', (e) => {
+                if (Date.now() - lastTouchAt < 800) return;
                 if (e.target.closest && e.target.closest('button')) return;
                 toggleImgZoomAt(e.clientX, e.clientY);
             });
@@ -3079,6 +3324,7 @@ window.__firebase_config = JSON.stringify({
                     <div class="relative w-28 lg:w-32 h-16 bg-black rounded-xl overflow-hidden flex-shrink-0 border border-brandBorder">
                         <img class="absolute inset-0 w-full h-full object-contain transition-transform group-hover:scale-105" src="${v.thumbnail}">
                         ${userFavorites.includes(v.id) ? '<i data-lucide="heart" class="absolute top-1 left-1 w-3.5 h-3.5 text-rose-400 fill-rose-400 z-10"></i>' : ''}
+                        ${userSaved.includes(v.id) ? '<i data-lucide="bookmark" class="absolute top-1 right-1 w-3.5 h-3.5 text-brandAccent fill-brandAccent z-10"></i>' : ''}
                         <span class="absolute bottom-1 right-1 bg-black/80 text-[9px] px-1 rounded font-mono text-white z-10 flex items-center gap-1">
                             ${isImage ? '<i data-lucide="image" class="w-2.5 h-2.5"></i>' : ''}${v.duration}
                         </span>
