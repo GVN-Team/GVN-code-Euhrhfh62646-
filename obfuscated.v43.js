@@ -746,7 +746,8 @@ const APP_LAYOUT_HTML = String.raw`
                 <button onclick="closeModal()" class="text-brandMuted hover:text-brandText transition-colors p-2"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
             <div class="overflow-y-auto flex-grow py-4 pr-1 space-y-4 scrollbar-thin">
-                <div class="space-y-3">
+                <p id="downloadReason" class="hidden text-[11px] text-red-400 bg-brandBg border border-brandBorder rounded-xl p-3 leading-relaxed break-all"></p>
+<div class="space-y-3">
                     <details class="group bg-brandBg rounded-2xl border border-brandBorder overflow-hidden" open>
                         <summary class="flex justify-between items-center p-4 cursor-pointer select-none hover:bg-brandSurface transition-colors">
                             <span class="text-sm font-black text-brandText flex items-center gap-2"><i data-lucide="smartphone" class="w-4 h-4 text-blue-400"></i>iPhone</span>
@@ -2139,12 +2140,11 @@ window.__firebase_config = JSON.stringify({
         function updateMediaSession() {
             try {
                 if (!('mediaSession' in navigator) || typeof MediaMetadata === 'undefined') return;
-                const base = window.location.href;
                 navigator.mediaSession.metadata = new MediaMetadata({
                     title: document.title,
                     artwork: [
-                        { src: new URL('apple-touch-icon.png', base).href, sizes: '180x180', type: 'image/png' },
-                        { src: new URL('artwork-512.png', base).href, sizes: '512x512', type: 'image/png' }
+                        { src: 'https://pub-79a6c6cc78c146739a6140aee2f59bc2.r2.dev/Image/apple-touch-icon_a0d5f87d.png', sizes: '180x180', type: 'image/png' },
+                        { src: 'https://pub-79a6c6cc78c146739a6140aee2f59bc2.r2.dev/Image/artwork-512_9c88b02a.png', sizes: '512x512', type: 'image/png' }
                     ]
                 });
             } catch (e) {}
@@ -3079,7 +3079,12 @@ window.__firebase_config = JSON.stringify({
             }
             if (navigator.share) {
                 try {
-                    await navigator.share({ title: SHARE_CONFIG.title, text: SHARE_CONFIG.text, url: finalShareUrl });
+                    // iPhoneの共有メニューは「テキスト + URL」をつなげてコピーするため、テキスト内のURLは除いてURLが2個続かないようにする
+                    const shareText = String(SHARE_CONFIG.text || '').replace(/https?:\/\/\S+/g, '').trim();
+                    const payload = { url: finalShareUrl };
+                    if (SHARE_CONFIG.title) payload.title = SHARE_CONFIG.title;
+                    if (shareText) payload.text = shareText;
+                    await navigator.share(payload);
                     showToast("共有メニューを開きました", 'share');
                 } catch (error) {}
             } else {
@@ -3113,7 +3118,7 @@ window.__firebase_config = JSON.stringify({
                 btn.disabled = true; txt.textContent = "準備中...";
                 try {
                     const res = await fetch(v.url);
-                    if (!res.ok) throw new Error();
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
                     const len = +res.headers.get('Content-Length');
                     const reader = res.body.getReader();
                     let rec = 0, chunks = [];
@@ -3125,19 +3130,40 @@ window.__firebase_config = JSON.stringify({
                     }
                     const blob = new Blob(chunks, { type: "video/mp4" });
                     const blobUrl = URL.createObjectURL(blob);
-                    const a = document.createElement("a"); a.href = blobUrl; a.download = v.url.substring(v.url.lastIndexOf('/') + 1) || `video_${activeId}.mp4`;
+                    const a = document.createElement("a"); a.href = blobUrl; a.download = buildDownloadName(v, 'mp4');
                     document.body.appendChild(a); a.click(); document.body.removeChild(a);
                     setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
                     showToast("ダウンロード開始", 'download');
                 } catch (e) {
-                    openDownloadModal(v.url);
+                    let reason;
+                    if (e && /^HTTP/.test(e.message || '')) reason = '配信元がエラーを返しました (' + e.message + ')';
+                    else if (e && e.name === 'TypeError') reason = 'ブラウザが動画の取得をブロックしました(配信元がCORSを許可していない、または通信エラー)';
+                    else reason = (e && e.message) ? e.message : '不明なエラー';
+                    openDownloadModal(v.url, reason);
                 } finally {
                     btn.disabled = false; txt.textContent = "ダウンロード";
                 }
             }
         }
 
-        function openDownloadModal(url) {
+        function buildDownloadName(v, ext) {
+            let name = '';
+            try {
+                name = decodeURIComponent(String(v.url).split('?')[0].split('#')[0].split('/').pop() || '');
+            } catch (e) {}
+            if (!name || !/\.[A-Za-z0-9]{2,5}$/.test(name)) {
+                const base = String(v.title || ('video_' + v.id)).replace(/[\\/:*?"<>|]/g, '_').trim().slice(0, 80) || ('video_' + v.id);
+                name = base + '.' + ext;
+            }
+            return name;
+        }
+
+        function openDownloadModal(url, reason) {
+            const reasonEl = document.getElementById("downloadReason");
+            if (reasonEl) {
+                if (reason) { reasonEl.textContent = '自動ダウンロードに失敗した理由: ' + reason; reasonEl.classList.remove('hidden'); }
+                else { reasonEl.textContent = ''; reasonEl.classList.add('hidden'); }
+            }
             document.getElementById("downloadModal").classList.remove("hidden");
             document.getElementById("iphoneDirectLink").href = url;
             document.getElementById("androidDirectLink").href = url;
