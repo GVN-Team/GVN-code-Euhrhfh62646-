@@ -1499,6 +1499,7 @@ window.__firebase_config = JSON.stringify({
         }
 
         function initApp() {
+            updateMediaSession();
             capturePendingLink();
             injectNewUi();
             lucide.createIcons();
@@ -2135,6 +2136,20 @@ window.__firebase_config = JSON.stringify({
             unlockBodyScroll();
         }
 
+        function updateMediaSession() {
+            try {
+                if (!('mediaSession' in navigator) || typeof MediaMetadata === 'undefined') return;
+                const base = window.location.href;
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: document.title,
+                    artwork: [
+                        { src: new URL('apple-touch-icon.png', base).href, sizes: '180x180', type: 'image/png' },
+                        { src: new URL('artwork-512.png', base).href, sizes: '512x512', type: 'image/png' }
+                    ]
+                });
+            } catch (e) {}
+        }
+
         function playRandom() {
             const pool = videos.filter(v => {
                 if (v.id === activeId) return false;
@@ -2678,6 +2693,7 @@ window.__firebase_config = JSON.stringify({
             renderPlaylist();
             updateFavoriteBtnUI();
             updateSaveBtnUI();
+            updateMediaSession();
             if (appConfig.recordHistory) recordHistory(v.id);
 
             const imageViewer = document.getElementById('imageViewer');
