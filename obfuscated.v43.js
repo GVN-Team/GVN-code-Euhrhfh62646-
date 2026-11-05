@@ -1488,6 +1488,7 @@ window.__firebase_config = JSON.stringify({
                     setStoredData('session_avatar', avatarUrl);
                     setStoredData('session_token', token);
                     setStoredData('session_discord_id', userData.id || '');
+                    setStoredData('session_discord_username', userData.username || '');
                     setStoredData('session_token_checked_at', Date.now());
                     if (userData.id) setStoredData('session_account_key', 'dc_' + userData.id);
                     applyLoginState(discordUsername, avatarUrl, userData.id || '');
@@ -1730,6 +1731,7 @@ window.__firebase_config = JSON.stringify({
                 localStorage.removeItem(STORAGE_PREFIX + 'session_token_checked_at');
                 localStorage.removeItem(STORAGE_PREFIX + 'session_discord_id');
                 localStorage.removeItem(STORAGE_PREFIX + 'session_account_key');
+                localStorage.removeItem(STORAGE_PREFIX + 'session_discord_username');
             } catch (e) {}
 
             currentUser = null;
@@ -3093,9 +3095,96 @@ window.__firebase_config = JSON.stringify({
             }
         }
 
+        const SETTING_BASE = 'https://firestore.googleapis.com/v1/projects/gvn-org-setting/databases/(default)/documents';
+
+        function unwrapFsValue(v) {
+            if (v == null) return null;
+            if ('stringValue' in v) return v.stringValue;
+            if ('integerValue' in v) return parseInt(v.integerValue, 10);
+            if ('doubleValue' in v) return v.doubleValue;
+            if ('booleanValue' in v) return v.booleanValue;
+            if ('mapValue' in v) {
+                const o = {};
+                const f = (v.mapValue && v.mapValue.fields) || {};
+                for (const k in f) o[k] = unwrapFsValue(f[k]);
+                return o;
+            }
+            if ('arrayValue' in v) return ((v.arrayValue && v.arrayValue.values) || []).map(unwrapFsValue);
+            return null;
+        }
+
+        async function fetchDownloadPermissions() {
+            const res = await savesFetch(SETTING_BASE + '/downloadPermissions/' + encodeURIComponent(window.APP_UNIQUE_ID));
+            if (res.status === 404) return null;
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const json = await res.json();
+            const out = {};
+            const f = json.fields || {};
+            for (const k in f) out[k] = unwrapFsValue(f[k]);
+            return out;
+        }
+
+        async function getDiscordIdentity() {
+            let id = String(currentUserDiscordId || getStoredData('session_discord_id', '') || '');
+            let username = String(getStoredData('session_discord_username', '') || '');
+            if (id && !username) {
+                // 以前のログインにはユーザー名が保存されていないので、Discordから取得して補う
+                const token = getStoredData('session_token', null);
+                if (token) {
+                    try {
+                        const r = await savesFetch('https://discord.com/api/v10/users/@me', { headers: { Authorization: 'Bearer ' + token } });
+                        if (r.ok) {
+                            const u = await r.json();
+                            username = String(u.username || '');
+                            if (u.id) id = String(u.id);
+                            if (username) setStoredData('session_discord_username', username);
+                        }
+                    } catch (e) {}
+                }
+            }
+            return { id: id, username: username };
+        }
+
+        // ダウンロードしてよい人か確認する(管理画面の「ダウンロード権限の管理」で設定)
+        async function checkDownloadPermission() {
+            let cfg;
+            try {
+                cfg = await fetchDownloadPermissions();
+            } catch (e) {
+                showToast("ダウンロード権限を確認できませんでした(通信エラー)", "system");
+                return false;
+            }
+            if (cfg && cfg.restrict === false) return true;
+            let allowed = false;
+            if (cfg) {
+                const hasDiscord = !!(currentUserDiscordId || getStoredData('session_discord_id', ''));
+                if (hasDiscord) {
+                    const me = await getDiscordIdentity();
+                    const list = Array.isArray(cfg.discord) ? cfg.discord : [];
+                    allowed = !!me.id && !!me.username && list.some(d => d && String(d.id) === me.id && String(d.username) === me.username);
+                } else {
+                    const list = Array.isArray(cfg.accounts) ? cfg.accounts : [];
+                    allowed = !!currentUser && list.some(n => String(n) === String(currentUser));
+                }
+            }
+            if (!allowed) showToast("ダウンロード権限が不足しています", "system");
+            return allowed;
+        }
+
         async function downloadMedia() {
             const v = videos.find(item => item.id === activeId);
             if (!v) return;
+
+            const gateBtn = document.getElementById("downloadBtn");
+            const gateTxt = document.getElementById("downloadBtnText");
+            if (gateBtn && gateBtn.disabled) return;
+            const gateLabel = gateTxt ? gateTxt.textContent : '';
+            if (gateBtn) gateBtn.disabled = true;
+            if (gateTxt) gateTxt.textContent = '確認中...';
+            const permitted = await checkDownloadPermission();
+            if (gateBtn) gateBtn.disabled = false;
+            if (gateTxt) gateTxt.textContent = gateLabel || 'ダウンロード';
+            if (!permitted) return;
 
             if (v.type === 'image' || v.images) {
                 const imgUrl = currentImages[currentImageIndex];
