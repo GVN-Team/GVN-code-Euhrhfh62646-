@@ -159,7 +159,10 @@ const APP_LAYOUT_HTML = String.raw`
                             </div>
 
                             <div class="flex items-center gap-1.5 sm:gap-4">
-                                <button id="theaterBtn" onclick="toggleTheaterMode()" class="p-2 text-white hover:text-brandAccent transition-colors hidden sm:flex items-center justify-center min-w-[40px] min-h-[40px]" title="大画面モード切替 (T)">
+                                <button id="toolsBtn" onclick="toggleToolsMenu(event)" class="p-2 text-white hover:text-brandAccent transition-colors flex items-center justify-center min-w-[40px] min-h-[40px] active:scale-90" title="ツール">
+                            <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
+                        </button>
+                        <button id="theaterBtn" onclick="toggleTheaterMode()" class="p-2 text-white hover:text-brandAccent transition-colors hidden sm:flex items-center justify-center min-w-[40px] min-h-[40px]" title="大画面モード切替 (T)">
                                     <i data-lucide="rectangle-horizontal" class="w-5 h-5"></i>
                                 </button>
                                 <button id="pipBtn" onclick="togglePiP()" class="p-2 text-white hover:text-brandAccent transition-colors hidden sm:flex items-center justify-center min-w-[40px] min-h-[40px]" title="ピクチャーインピクチャー">
@@ -169,6 +172,34 @@ const APP_LAYOUT_HTML = String.raw`
                                     <i data-lucide="maximize" class="w-5 h-5"></i>
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                    <div id="toolsMenu" class="hidden absolute right-2 bottom-24 sm:bottom-28 w-64 max-w-[calc(100%-1rem)] max-h-[70%] overflow-y-auto bg-black/90 border border-white/15 rounded-2xl p-4 z-50 space-y-4 text-white shadow-2xl" onclick="event.stopPropagation()">
+                        <div>
+                            <div class="flex items-center justify-between mb-2"><span class="text-[11px] font-black tracking-wider">スリープタイマー</span><span id="sleepStatus" class="text-[10px] text-brandAccent font-mono"></span></div>
+                            <div id="sleepChips" class="flex flex-wrap gap-1.5">
+                                <button class="tool-chip" data-min="0" onclick="setSleepTimer(0)">オフ</button>
+                                <button class="tool-chip" data-min="15" onclick="setSleepTimer(15)">15分</button>
+                                <button class="tool-chip" data-min="30" onclick="setSleepTimer(30)">30分</button>
+                                <button class="tool-chip" data-min="60" onclick="setSleepTimer(60)">60分</button>
+                                <button class="tool-chip" data-min="-1" onclick="setSleepTimer(-1)">動画の終わり</button>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between mb-2"><span class="text-[11px] font-black tracking-wider">A-Bリピート</span><span id="abStatus" class="text-[10px] text-brandAccent font-mono"></span></div>
+                            <button id="abBtn" class="tool-chip w-full" onclick="abStep()">A点を設定</button>
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between mb-2"><span class="text-[11px] font-black tracking-wider">音量ブースト</span><span id="boostStatus" class="text-[10px] text-brandAccent font-mono"></span></div>
+                            <div id="boostChips" class="flex flex-wrap gap-1.5">
+                                <button class="tool-chip" data-level="1" onclick="setBoost(1)">オフ</button>
+                                <button class="tool-chip" data-level="1.5" onclick="setBoost(1.5)">150%</button>
+                                <button class="tool-chip" data-level="2" onclick="setBoost(2)">200%</button>
+                                <button class="tool-chip" data-level="3" onclick="setBoost(3)">300%</button>
+                            </div>
+                        </div>
+                        <div>
+                            <button class="tool-chip w-full flex items-center justify-center gap-1.5" onclick="takeScreenshot()"><i data-lucide="camera" class="w-3.5 h-3.5"></i>スクリーンショットを保存</button>
                         </div>
                     </div>
                     <div id="videoSpinner" class="absolute inset-0 bg-black/50 flex items-center justify-center pointer-events-none hidden z-20">
@@ -199,6 +230,25 @@ const APP_LAYOUT_HTML = String.raw`
                     </div>
                     <div class="p-4 bg-brandBg rounded-2xl text-sm leading-relaxed border border-brandBorder">
                         <p id="videoDesc" class="whitespace-pre-line text-xs lg:text-sm text-brandMuted select-text">動画情報をロード中...</p>
+                    </div>
+                    <div id="extraInfo" class="space-y-5">
+                        <div id="relatedBox" class="hidden space-y-2">
+                            <h2 class="text-xs font-black text-brandMuted tracking-wider flex items-center gap-2"><i data-lucide="layers" class="w-4 h-4"></i>関連動画</h2>
+                            <div id="relatedList" class="flex gap-3 overflow-x-auto pb-2 scrollbar-thin"></div>
+                        </div>
+                        <div class="space-y-2">
+                            <h2 class="text-xs font-black text-brandMuted tracking-wider flex items-center gap-2"><i data-lucide="smile" class="w-4 h-4"></i>リアクション</h2>
+                            <div id="reactionBar" class="flex flex-wrap gap-2"></div>
+                        </div>
+                        <div class="space-y-3">
+                            <h2 class="text-xs font-black text-brandMuted tracking-wider flex items-center gap-2"><i data-lucide="message-circle" class="w-4 h-4"></i>コメント <span id="commentCount" class="text-brandAccent font-mono"></span></h2>
+                            <div class="flex gap-2">
+                                <input id="commentInput" type="text" maxlength="300" placeholder="コメントを書く..." class="flex-1 min-w-0 bg-brandBg border border-brandBorder rounded-xl px-3 py-2.5 text-xs text-brandText placeholder-brandMuted focus:border-brandAccent focus:outline-none transition-colors">
+                                <button id="commentSendBtn" onclick="postComment()" class="px-4 py-2.5 bg-brandAccent text-white rounded-xl text-xs font-black active:scale-95 transition-all min-h-[40px]">送信</button>
+                            </div>
+                            <p id="commentStatus" class="text-[10px] text-brandMuted break-all"></p>
+                            <div id="commentList" class="space-y-2"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -241,6 +291,10 @@ const APP_LAYOUT_HTML = String.raw`
                         <i data-lucide="x" class="w-4 h-4"></i>
                     </button>
                 </div>
+
+                <select id="monthFilter" onchange="setMonthFilter(this.value)" class="w-full bg-brandSurface border border-brandBorder rounded-xl px-3 py-2.5 text-xs text-brandText font-bold focus:border-brandAccent focus:outline-none transition-colors">
+                    <option value="">すべての月</option>
+                </select>
 
                 <div id="playlist" class="space-y-3"></div>
             </aside>
@@ -1620,6 +1674,18 @@ window.__firebase_config = JSON.stringify({
             
             userWatchHistory = getStoredData('history_' + currentUser, []);
             userFavorites = getStoredData('favorites_' + currentUser, []);
+            {
+                // 前回の閲覧(30分以上あけた訪問)以降に追加された動画を「NEW」にする
+                const nowMs = Date.now();
+                const lastVisit = getStoredData('last_visit_' + currentUser, 0);
+                let prevVisit = getStoredData('prev_visit_' + currentUser, 0);
+                if (!lastVisit) prevVisit = 0;
+                else if (nowMs - lastVisit > 30 * 60 * 1000) prevVisit = lastVisit;
+                setStoredData('prev_visit_' + currentUser, prevVisit);
+                setStoredData('last_visit_' + currentUser, nowMs);
+                newSinceMs = prevVisit;
+            }
+            getLikesAuth().then(() => renderSocial()).catch(() => {});
             userResumeTimes = getStoredData('resumes_' + currentUser, {});
 
             window.currentUser = currentUser;
@@ -2152,9 +2218,640 @@ window.__firebase_config = JSON.stringify({
             } catch (e) {}
         }
 
+        // ================= 新着・進捗・月絞り込み・関連動画 =================
+        let monthFilter = '';
+        let newSinceMs = 0;
+
+        function parseDurationSec(str) {
+            if (!str) return 0;
+            const p = String(str).trim().split(':').map(Number);
+            if (p.some(n => isNaN(n))) return 0;
+            if (p.length === 3) return p[0] * 3600 + p[1] * 60 + p[2];
+            if (p.length === 2) return p[0] * 60 + p[1];
+            return 0;
+        }
+
+        function monthKeyOf(v) {
+            const m = String((v && v.date) || '').match(/(\d{4})\D+(\d{1,2})/);
+            return m ? m[1] + '-' + String(m[2]).padStart(2, '0') : '';
+        }
+
+        function updateMonthOptions() {
+            const sel = document.getElementById('monthFilter');
+            if (!sel) return;
+            const counts = {};
+            videos.forEach(v => { const k = monthKeyOf(v); if (k) counts[k] = (counts[k] || 0) + 1; });
+            const keys = Object.keys(counts).sort().reverse();
+            const sig = keys.map(k => k + ':' + counts[k]).join(',');
+            if (sel.dataset.sig === sig) return;
+            sel.dataset.sig = sig;
+            const cur = monthFilter;
+            sel.innerHTML = '<option value="">すべての月</option>' + keys.map(k =>
+                `<option value="${k}">${k.slice(0, 4)}年${parseInt(k.slice(5), 10)}月 (${counts[k]})</option>`).join('');
+            if (keys.includes(cur)) sel.value = cur; else { sel.value = ''; monthFilter = ''; }
+        }
+
+        function setMonthFilter(val) {
+            monthFilter = val || '';
+            renderPlaylist();
+        }
+
+        function getCreatedMs(v) {
+            const c = v && v.createdAt;
+            if (c && typeof c.toMillis === 'function') return c.toMillis();
+            if (typeof c === 'string') { const t = Date.parse(c); if (!isNaN(t)) return t; }
+            if (typeof c === 'number') return c;
+            const d = Date.parse(String((v && v.date) || '').replace(/\./g, '/'));
+            return isNaN(d) ? 0 : d;
+        }
+
+        function isNewVideo(v) {
+            if (!newSinceMs) return false;
+            if (userWatchHistory.some(h => h.id === v.id)) return false;
+            return getCreatedMs(v) > newSinceMs;
+        }
+
+        function progressRatio(v) {
+            if (!v || v.type === 'image' || v.images) return 0;
+            const d = parseDurationSec(v.duration);
+            const t = userResumeTimes[v.id] || 0;
+            if (!d || t < 5) return 0;
+            const r = t / d;
+            return r > 0.97 ? 1 : Math.min(1, r);
+        }
+
+        function tagsOf(v) {
+            const m = String((v && v.desc) || '').match(/[#＃][^\s#＃]+/g) || [];
+            return Array.from(new Set(m.map(t => t.slice(1).toLowerCase())));
+        }
+
+        function renderRelated() {
+            const box = document.getElementById('relatedBox');
+            const list = document.getElementById('relatedList');
+            if (!box || !list) return;
+            const cur = videos.find(x => x.id === activeId);
+            if (!cur) { box.classList.add('hidden'); return; }
+            const tags = tagsOf(cur);
+            const items = videos.filter(x => x.id !== cur.id)
+                .map(x => ({ v: x, score: tagsOf(x).filter(t => tags.includes(t)).length }))
+                .filter(x => x.score > 0)
+                .sort((a, b) => b.score - a.score || new Date(b.v.date) - new Date(a.v.date))
+                .slice(0, 8);
+            const sig = cur.id + ':' + items.map(x => x.v.id).join(',');
+            if (list.dataset.sig === sig) return;
+            list.dataset.sig = sig;
+            list.innerHTML = '';
+            if (items.length === 0) { box.classList.add('hidden'); return; }
+            box.classList.remove('hidden');
+            items.forEach(({ v }) => {
+                const card = document.createElement('div');
+                card.className = 'flex-shrink-0 w-36 cursor-pointer group';
+                card.onclick = () => {
+                    loadMedia(v.id);
+                    const c = document.getElementById('videoContainer');
+                    if (c && c.scrollIntoView) c.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                };
+                const th = document.createElement('div');
+                th.className = 'relative w-36 h-20 bg-black rounded-xl overflow-hidden border border-brandBorder';
+                const img = document.createElement('img');
+                img.src = v.thumbnail || '';
+                img.className = 'absolute inset-0 w-full h-full object-contain';
+                th.appendChild(img);
+                const title = document.createElement('p');
+                title.className = 'text-[11px] font-bold text-brandText line-clamp-2 mt-1.5 group-hover:text-brandAccent transition-colors';
+                title.textContent = v.title || '';
+                card.appendChild(th);
+                card.appendChild(title);
+                list.appendChild(card);
+            });
+        }
+
+        // ================= ツール(スリープ・A-B・音量ブースト・スクリーンショット) =================
+        let sleepMinutes = 0;
+        let sleepTimerEnd = 0;
+        let sleepTimerId = null;
+        let sleepAtEnd = false;
+        let abA = null;
+        let abB = null;
+        let abTimer = null;
+        let boostLevel = 1;
+        let boostCtx = null;
+        let boostGain = null;
+        let boostRouted = false;
+
+        function formatMmSs(ms) {
+            const s = Math.max(0, Math.ceil(ms / 1000));
+            return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+        }
+
+        function toggleToolsMenu(e) {
+            if (e) e.stopPropagation();
+            const menu = document.getElementById('toolsMenu');
+            if (!menu) return;
+            menu.classList.toggle('hidden');
+            updateToolsUI();
+            lucide.createIcons();
+        }
+
+        function updateToolsUI() {
+            const sleepStatus = document.getElementById('sleepStatus');
+            if (sleepStatus) {
+                sleepStatus.textContent = sleepAtEnd ? '動画の終わりまで' : (sleepTimerEnd ? '残り ' + formatMmSs(sleepTimerEnd - Date.now()) : '');
+            }
+            document.querySelectorAll('#sleepChips .tool-chip').forEach(b => {
+                b.classList.toggle('active', parseInt(b.getAttribute('data-min'), 10) === sleepMinutes);
+            });
+            const abBtn = document.getElementById('abBtn');
+            const abStatus = document.getElementById('abStatus');
+            if (abBtn && abStatus) {
+                if (abA === null) { abBtn.textContent = 'A点を設定'; abStatus.textContent = ''; abBtn.classList.remove('active'); }
+                else if (abB === null) { abBtn.textContent = 'B点を設定'; abStatus.textContent = 'A ' + formatTime(abA); abBtn.classList.remove('active'); }
+                else { abBtn.textContent = '解除'; abStatus.textContent = formatTime(abA) + ' → ' + formatTime(abB); abBtn.classList.add('active'); }
+            }
+            document.querySelectorAll('#boostChips .tool-chip').forEach(b => {
+                b.classList.toggle('active', parseFloat(b.getAttribute('data-level')) === boostLevel);
+            });
+            const boostStatus = document.getElementById('boostStatus');
+            if (boostStatus) boostStatus.textContent = boostLevel > 1 ? Math.round(boostLevel * 100) + '%' : '';
+            const toolsBtnEl = document.getElementById('toolsBtn');
+            if (toolsBtnEl) {
+                const any = sleepMinutes !== 0 || abA !== null || boostLevel > 1;
+                toolsBtnEl.classList.toggle('text-brandAccent', any);
+                toolsBtnEl.classList.toggle('text-white', !any);
+            }
+        }
+
+        function setSleepTimer(min) {
+            if (sleepTimerId) { clearInterval(sleepTimerId); sleepTimerId = null; }
+            sleepTimerEnd = 0;
+            sleepAtEnd = false;
+            sleepMinutes = min;
+            if (min > 0) {
+                sleepTimerEnd = Date.now() + min * 60000;
+                sleepTimerId = setInterval(() => {
+                    if (Date.now() >= sleepTimerEnd) {
+                        clearInterval(sleepTimerId);
+                        sleepTimerId = null;
+                        sleepTimerEnd = 0;
+                        sleepMinutes = 0;
+                        if (player) player.pause();
+                        showToast("スリープタイマーで停止しました", "system");
+                    }
+                    updateToolsUI();
+                }, 1000);
+                showToast(min + "分後に停止します", "system");
+            } else if (min < 0) {
+                sleepAtEnd = true;
+                showToast("この動画が終わったら停止します", "system");
+            }
+            updateToolsUI();
+        }
+
+        function abStep() {
+            if (!player || isNaN(player.duration)) return;
+            if (abA === null) {
+                abA = player.currentTime;
+            } else if (abB === null) {
+                const t = player.currentTime;
+                if (t <= abA + 0.5) { showToast("B点はA点より後ろにしてください", "system"); return; }
+                abB = t;
+                if (abTimer) clearInterval(abTimer);
+                abTimer = setInterval(() => {
+                    if (abA !== null && abB !== null && player.currentTime >= abB) player.currentTime = abA;
+                }, 80);
+            } else {
+                clearAbRepeat();
+            }
+            updateToolsUI();
+        }
+
+        function clearAbRepeat() {
+            abA = null;
+            abB = null;
+            if (abTimer) { clearInterval(abTimer); abTimer = null; }
+        }
+
+        function resetPlayerTools() {
+            clearAbRepeat();
+            updateToolsUI();
+        }
+
+        async function hostAllowsCors(url) {
+            try {
+                const ctrl = new AbortController();
+                const timer = setTimeout(() => ctrl.abort(), 8000);
+                const res = await fetch(url, { method: 'HEAD', mode: 'cors', signal: ctrl.signal });
+                clearTimeout(timer);
+                return res.ok;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        async function setBoost(level) {
+            if (!player) return;
+            if (level <= 1 && !boostRouted) { boostLevel = 1; updateToolsUI(); return; }
+            const cur = videos.find(x => x.id === activeId);
+            if (!cur || cur.type === 'image' || cur.images) { showToast("動画の再生中だけ使えます", "system"); return; }
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) { showToast("この端末は音量ブーストに対応していません", "system"); return; }
+            if (!boostCtx) {
+                // タップ直後に作らないとiPhoneで音が出なくなるため、最初に同期で作る
+                boostCtx = new AC();
+                if (boostCtx.resume) boostCtx.resume().catch(() => {});
+            }
+            if (!boostRouted) {
+                if (!(await hostAllowsCors(cur.url))) {
+                    showToast("この動画の配信元がCORSを許可していないため、音量ブーストは使えません", "system");
+                    return;
+                }
+                const t = player.currentTime;
+                const wasPlaying = !player.paused;
+                player.crossOrigin = 'anonymous';
+                const ok = await new Promise((resolve) => {
+                    const done = (r) => {
+                        player.removeEventListener('loadedmetadata', onOk);
+                        player.removeEventListener('error', onNg);
+                        resolve(r);
+                    };
+                    const onOk = () => done(true);
+                    const onNg = () => done(false);
+                    player.addEventListener('loadedmetadata', onOk);
+                    player.addEventListener('error', onNg);
+                    player.load();
+                });
+                if (!ok) {
+                    player.removeAttribute('crossorigin');
+                    player.load();
+                    showToast("音量ブーストを有効にできませんでした", "system");
+                    return;
+                }
+                try { player.currentTime = t; } catch (e) {}
+                if (wasPlaying) player.play().catch(() => {});
+                try {
+                    const src = boostCtx.createMediaElementSource(player);
+                    boostGain = boostCtx.createGain();
+                    src.connect(boostGain);
+                    boostGain.connect(boostCtx.destination);
+                    boostRouted = true;
+                } catch (e) {
+                    showToast("音量ブーストを有効にできませんでした", "system");
+                    return;
+                }
+            }
+            boostLevel = level;
+            boostGain.gain.value = level;
+            if (boostCtx.state === 'suspended') boostCtx.resume().catch(() => {});
+            updateToolsUI();
+            showToast(level > 1 ? "音量を" + Math.round(level * 100) + "%にしました" : "音量ブーストをオフにしました", "system");
+        }
+
+        // ブースト使用後は音声がWebAudio経由になる。CORS非対応の動画だと無音になるため、その場合は再読み込みで戻す
+        async function verifyBoostCompat(v) {
+            if (!boostRouted || !v || v.type === 'image' || v.images) return;
+            const ok = await hostAllowsCors(v.url);
+            if (ok || activeId !== v.id) return;
+            showToast("この動画は音量ブースト後に音が出ないため、ページを再読み込みします", "system");
+            setStoredData(PENDING_LINK_KEY, { v: v.id, t: 0, ts: Date.now() });
+            setTimeout(() => window.location.reload(), 2500);
+        }
+
+        function frameToBlob(el) {
+            return new Promise((resolve, reject) => {
+                const c = document.createElement('canvas');
+                c.width = el.videoWidth;
+                c.height = el.videoHeight;
+                c.getContext('2d').drawImage(el, 0, 0);
+                c.toBlob(b => b ? resolve(b) : reject(new Error('toBlob')), 'image/png');
+            });
+        }
+
+        function frameViaCorsVideo(url, t) {
+            return new Promise((resolve, reject) => {
+                const vid = document.createElement('video');
+                vid.crossOrigin = 'anonymous';
+                vid.muted = true;
+                vid.preload = 'auto';
+                vid.playsInline = true;
+                const finish = (fn, arg) => { clearTimeout(timer); vid.removeAttribute('src'); vid.load(); fn(arg); };
+                const timer = setTimeout(() => finish(reject, new Error('timeout')), 20000);
+                vid.onerror = () => finish(reject, new Error('load'));
+                vid.onloadedmetadata = () => { try { vid.currentTime = Math.min(t, vid.duration || t); } catch (e) { finish(reject, e); } };
+                vid.onseeked = () => { frameToBlob(vid).then(b => finish(resolve, b)).catch(e => finish(reject, e)); };
+                vid.src = url;
+            });
+        }
+
+        async function takeScreenshot() {
+            const v = videos.find(x => x.id === activeId);
+            if (!v || v.type === 'image' || v.images || !player || !player.videoWidth) {
+                showToast("動画を再生してから撮影してください", "system");
+                return;
+            }
+            // ダウンロード権限と共通(画像として取り出せるため)
+            if (!(await checkDownloadPermission())) return;
+            const t = player.currentTime;
+            let blob = null;
+            try { blob = await frameToBlob(player); } catch (e) { blob = null; }
+            if (!blob) {
+                try { blob = await frameViaCorsVideo(v.url, t); } catch (e) { blob = null; }
+            }
+            if (!blob) {
+                showToast("撮影できませんでした(動画の配信元がCORSを許可していない可能性があります)", "system");
+                return;
+            }
+            const base = String(v.title || 'screenshot').replace(/[\\/:*?"<>|]/g, '_').slice(0, 60);
+            const name = base + '_' + formatTime(t).replace(':', '-') + '.png';
+            const file = new File([blob], name, { type: 'image/png' });
+            const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+            if (isMobile && navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({ files: [file] });
+                    return;
+                } catch (e) {
+                    if (e && e.name === 'AbortError') return;
+                }
+            }
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 10000);
+            showToast("スクリーンショットを保存しました", "download");
+        }
+
+        // ================= リアクション・コメント(likes-and-saves) =================
+        const LIKES_FIREBASE_CONFIG = {
+            apiKey: SAVES_API_KEY,
+            authDomain: 'likes-and-saves.firebaseapp.com',
+            projectId: 'likes-and-saves',
+            storageBucket: 'likes-and-saves.firebasestorage.app',
+            messagingSenderId: '336427657362',
+            appId: '1:336427657362:web:9d8ca4cf6080b0d0265e4b'
+        };
+        const LIKES_DOCS = 'https://firestore.googleapis.com/v1/projects/likes-and-saves/databases/(default)/documents';
+        const REACTION_TYPES = [['heart', '❤️'], ['fire', '🔥'], ['laugh', '😂'], ['clap', '👏'], ['wow', '😮']];
+        let likesAuthPromise = null;
+        let likesUid = '';
+        let socialVideoId = null;
+        let socialComments = [];
+        let socialReactions = [];
+        let commentSending = false;
+        let lastCommentAt = 0;
+
+        function getLikesAuth() {
+            if (likesAuthPromise) return likesAuthPromise;
+            likesAuthPromise = (async () => {
+                const { initializeApp } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js');
+                const { getAuth, signInAnonymously, onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js');
+                const app = initializeApp(LIKES_FIREBASE_CONFIG, 'likes');
+                const auth = getAuth(app);
+                await new Promise((resolve, reject) => {
+                    const timer = setTimeout(() => reject(new Error('認証がタイムアウトしました')), 12000);
+                    onAuthStateChanged(auth, (u) => { if (u) { clearTimeout(timer); resolve(u); } });
+                    signInAnonymously(auth).catch((err) => { clearTimeout(timer); reject(err); });
+                });
+                likesUid = auth.currentUser.uid;
+                return auth;
+            })().catch((e) => { likesAuthPromise = null; throw e; });
+            return likesAuthPromise;
+        }
+
+        async function likesAuthHeaders() {
+            const auth = await getLikesAuth();
+            const token = await auth.currentUser.getIdToken();
+            return { Authorization: 'Bearer ' + token };
+        }
+
+        function plainDoc(d) {
+            const o = {};
+            const f = d.fields || {};
+            for (const k in f) o[k] = unwrapFsValue(f[k]);
+            o._id = String(d.name || '').split('/').pop();
+            return o;
+        }
+
+        async function likesRunQuery(collectionId, siteId, videoId) {
+            const body = {
+                structuredQuery: {
+                    from: [{ collectionId: collectionId }],
+                    where: {
+                        compositeFilter: {
+                            op: 'AND',
+                            filters: [
+                                { fieldFilter: { field: { fieldPath: 'siteId' }, op: 'EQUAL', value: { stringValue: siteId } } },
+                                { fieldFilter: { field: { fieldPath: 'videoId' }, op: 'EQUAL', value: { integerValue: String(videoId) } } }
+                            ]
+                        }
+                    },
+                    limit: 300
+                }
+            };
+            const res = await savesFetch(LIKES_DOCS + ':runQuery?key=' + SAVES_API_KEY, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const arr = await res.json();
+            return arr.filter(x => x.document).map(x => plainDoc(x.document));
+        }
+
+        function setCommentStatus(msg) {
+            const el = document.getElementById('commentStatus');
+            if (el) el.textContent = msg || '';
+        }
+
+        function formatAgo(ms) {
+            const diff = Date.now() - ms;
+            if (diff < 60000) return 'たった今';
+            if (diff < 3600000) return Math.floor(diff / 60000) + '分前';
+            if (diff < 86400000) return Math.floor(diff / 3600000) + '時間前';
+            const d = new Date(ms);
+            return (d.getMonth() + 1) + '/' + d.getDate();
+        }
+
+        function renderSocial() {
+            const bar = document.getElementById('reactionBar');
+            const list = document.getElementById('commentList');
+            if (!bar || !list) return;
+            const myKey = currentAccountKey();
+            const mine = socialReactions.find(r => r.accountKey === myKey);
+            bar.innerHTML = '';
+            REACTION_TYPES.forEach(([key, emoji]) => {
+                const count = socialReactions.filter(r => r.emoji === key).length;
+                const on = !!(mine && mine.emoji === key);
+                const b = document.createElement('button');
+                b.className = 'px-3 py-2 rounded-full border text-sm font-bold flex items-center gap-1.5 active:scale-95 transition-all min-h-[40px] ' +
+                    (on ? 'border-brandAccent bg-brandAccent/20 text-brandText' : 'border-brandBorder bg-brandBg text-brandMuted');
+                const e1 = document.createElement('span');
+                e1.textContent = emoji;
+                const e2 = document.createElement('span');
+                e2.className = 'text-xs font-mono';
+                e2.textContent = String(count);
+                b.appendChild(e1);
+                b.appendChild(e2);
+                b.onclick = () => toggleReaction(key);
+                bar.appendChild(b);
+            });
+
+            const cc = document.getElementById('commentCount');
+            if (cc) cc.textContent = socialComments.length > 0 ? String(socialComments.length) : '';
+            list.innerHTML = '';
+            if (socialComments.length === 0) {
+                const p = document.createElement('p');
+                p.className = 'text-[11px] text-brandMuted';
+                p.textContent = 'まだコメントはありません';
+                list.appendChild(p);
+                return;
+            }
+            socialComments.forEach(c => {
+                const row = document.createElement('div');
+                row.className = 'bg-brandBg border border-brandBorder rounded-xl px-3 py-2.5';
+                const head = document.createElement('div');
+                head.className = 'flex items-center justify-between gap-2';
+                const who = document.createElement('span');
+                who.className = 'text-[11px] font-black text-brandText truncate';
+                who.textContent = c.name || '名無し';
+                const right = document.createElement('span');
+                right.className = 'flex items-center gap-2 flex-shrink-0';
+                const when = document.createElement('span');
+                when.className = 'text-[10px] text-brandMuted';
+                when.textContent = formatAgo(c.createdAt || 0);
+                right.appendChild(when);
+                if (likesUid && c.uid === likesUid) {
+                    const del = document.createElement('button');
+                    del.className = 'text-[10px] text-brandMuted hover:text-red-500 transition-colors p-1';
+                    del.textContent = '削除';
+                    del.onclick = () => deleteComment(c._id);
+                    right.appendChild(del);
+                }
+                head.appendChild(who);
+                head.appendChild(right);
+                const text = document.createElement('p');
+                text.className = 'text-xs text-brandText mt-1 whitespace-pre-line break-words select-text';
+                text.textContent = c.text || '';
+                row.appendChild(head);
+                row.appendChild(text);
+                list.appendChild(row);
+            });
+        }
+
+        async function loadSocial(videoId) {
+            socialVideoId = videoId;
+            socialComments = [];
+            socialReactions = [];
+            renderSocial();
+            if (!likesUid) getLikesAuth().then(() => renderSocial()).catch(() => {});
+            try {
+                const [comments, reactions] = await Promise.all([
+                    likesRunQuery('comments', window.APP_UNIQUE_ID, videoId),
+                    likesRunQuery('reactions', window.APP_UNIQUE_ID, videoId)
+                ]);
+                if (socialVideoId !== videoId) return;
+                socialComments = comments.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                socialReactions = reactions;
+                setCommentStatus('');
+            } catch (e) {
+                if (socialVideoId === videoId) setCommentStatus('コメントを読み込めませんでした (' + (e && e.message ? e.message : '通信エラー') + ')');
+            }
+            if (socialVideoId === videoId) renderSocial();
+        }
+
+        async function toggleReaction(key) {
+            if (!currentUser) return;
+            const accountKey = currentAccountKey();
+            if (!accountKey) {
+                showToast("リアクションを使うには、一度ログアウトしてもう一度ログインしてください", "system");
+                return;
+            }
+            const videoId = activeId;
+            const docId = window.APP_UNIQUE_ID + '__' + videoId + '__' + accountKey;
+            const prev = socialReactions.slice();
+            const mine = socialReactions.find(r => r.accountKey === accountKey);
+            const removing = !!(mine && mine.emoji === key);
+            socialReactions = socialReactions.filter(r => r.accountKey !== accountKey);
+            if (!removing) socialReactions.push({ accountKey: accountKey, emoji: key, siteId: window.APP_UNIQUE_ID, videoId: videoId });
+            renderSocial();
+            try {
+                const headers = await likesAuthHeaders();
+                const url = LIKES_DOCS + '/reactions/' + encodeURIComponent(docId);
+                let res;
+                if (removing) {
+                    res = await savesFetch(url, { method: 'DELETE', headers: headers });
+                } else {
+                    res = await savesFetch(url, {
+                        method: 'PATCH',
+                        headers: Object.assign({ 'Content-Type': 'application/json' }, headers),
+                        body: JSON.stringify({ fields: {
+                            siteId: { stringValue: window.APP_UNIQUE_ID },
+                            videoId: { integerValue: String(videoId) },
+                            accountKey: { stringValue: accountKey },
+                            emoji: { stringValue: key }
+                        } })
+                    });
+                }
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+            } catch (e) {
+                if (socialVideoId === videoId) { socialReactions = prev; renderSocial(); }
+                showToast("リアクションに失敗しました (" + (e && e.message ? e.message : '通信エラー') + ")", "system");
+            }
+        }
+
+        async function postComment() {
+            if (!currentUser || commentSending) return;
+            const input = document.getElementById('commentInput');
+            const btn = document.getElementById('commentSendBtn');
+            const text = input.value.trim();
+            if (!text) return;
+            if (Date.now() - lastCommentAt < 5000) { setCommentStatus('連続投稿はできません。少し待ってください'); return; }
+            commentSending = true;
+            btn.disabled = true;
+            setCommentStatus('送信中...');
+            const videoId = activeId;
+            try {
+                const headers = Object.assign({ 'Content-Type': 'application/json' }, await likesAuthHeaders());
+                const body = { fields: {
+                    siteId: { stringValue: window.APP_UNIQUE_ID },
+                    videoId: { integerValue: String(videoId) },
+                    name: { stringValue: String(currentUser).slice(0, 40) },
+                    text: { stringValue: text.slice(0, 300) },
+                    uid: { stringValue: likesUid },
+                    createdAt: { integerValue: String(Date.now()) }
+                } };
+                const res = await savesFetch(LIKES_DOCS + '/comments', { method: 'POST', headers: headers, body: JSON.stringify(body) });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const created = plainDoc(await res.json());
+                input.value = '';
+                lastCommentAt = Date.now();
+                if (socialVideoId === videoId) { socialComments.unshift(created); renderSocial(); }
+                setCommentStatus('');
+            } catch (e) {
+                setCommentStatus('投稿に失敗しました (' + (e && e.message ? e.message : '通信エラー') + ')');
+            } finally {
+                commentSending = false;
+                btn.disabled = false;
+            }
+        }
+
+        async function deleteComment(id) {
+            if (!id || !confirm('このコメントを削除しますか?')) return;
+            const videoId = activeId;
+            try {
+                const headers = await likesAuthHeaders();
+                const res = await savesFetch(LIKES_DOCS + '/comments/' + encodeURIComponent(id), { method: 'DELETE', headers: headers });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                if (socialVideoId === videoId) { socialComments = socialComments.filter(c => c._id !== id); renderSocial(); }
+            } catch (e) {
+                setCommentStatus('削除に失敗しました (' + (e && e.message ? e.message : '通信エラー') + ')');
+            }
+        }
+
         function playRandom() {
             const pool = videos.filter(v => {
                 if (v.id === activeId) return false;
+                if (monthFilter && monthKeyOf(v) !== monthFilter) return false;
                 if (!searchQuery) return true;
                 return (v.title || '').toLowerCase().includes(searchQuery)
                     || (v.desc || '').toLowerCase().includes(searchQuery)
@@ -2206,6 +2903,8 @@ window.__firebase_config = JSON.stringify({
             .gauge { position: relative; width: min(130px, 40vw); height: 3px; border-radius: 999px; background: var(--border-color); overflow: hidden; }
             .gauge-bar { position: absolute; top: 0; left: 0; height: 100%; width: 30%; background: linear-gradient(90deg, rgba(234,88,12,0) 0%, #ea580c 35%, #ea580c 65%, rgba(234,88,12,0) 100%); animation: gauge-slide 1.4s ease-in-out infinite alternate; }
             @keyframes gauge-slide { from { transform: translateX(0); } to { transform: translateX(233.34%); } }
+            .tool-chip { padding: 6px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.25); font-size: 11px; font-weight: 700; color: #fff; background: transparent; }
+            .tool-chip.active { background: var(--accent); border-color: var(--accent); }
             .ts-link { color: var(--accent); font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
             html[data-theme="light"] { --bg-main: #f4f4f5; --bg-surface: #ffffff; --text-main: #18181b; --text-muted: #71717a; --border-color: #d4d4d8; --header-bg: #ffffff; color-scheme: light; }
         `;
@@ -2237,6 +2936,15 @@ window.__firebase_config = JSON.stringify({
                 if (player.paused) player.play().catch(() => {});
                 const box = document.getElementById('videoContainer');
                 if (box && box.scrollIntoView) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+
+            document.addEventListener('click', (e) => {
+                const menu = document.getElementById('toolsMenu');
+                if (menu && !menu.classList.contains('hidden') && !menu.contains(e.target)) menu.classList.add('hidden');
+            });
+            const ci = document.getElementById('commentInput');
+            if (ci) ci.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); postComment(); }
             });
 
             lucide.createIcons();
@@ -2696,6 +3404,10 @@ window.__firebase_config = JSON.stringify({
             updateFavoriteBtnUI();
             updateSaveBtnUI();
             updateMediaSession();
+            resetPlayerTools();
+            renderRelated();
+            loadSocial(v.id);
+            verifyBoostCompat(v);
             if (appConfig.recordHistory) recordHistory(v.id);
 
             const imageViewer = document.getElementById('imageViewer');
@@ -3328,8 +4040,11 @@ window.__firebase_config = JSON.stringify({
 
         function renderPlaylist() {
             playlistContainer.innerHTML = "";
+            updateMonthOptions();
+            renderRelated();
 
             let filtered = videos.filter(v => {
+                if (monthFilter && monthKeyOf(v) !== monthFilter) return false;
                 if (!searchQuery) return true;
                 const titleMatch = v.title.toLowerCase().includes(searchQuery);
                 const descMatch = v.desc.toLowerCase().includes(searchQuery);
@@ -3356,6 +4071,8 @@ window.__firebase_config = JSON.stringify({
             filtered.forEach(v => {
                 const isActive = v.id === activeId;
                 const isImage = v.type === 'image';
+                const isNewV = isNewVideo(v);
+                const prog = progressRatio(v);
                 const card = document.createElement("div");
                 card.onclick = () => {
                     if(!isActive) loadMedia(v.id);
@@ -3366,6 +4083,8 @@ window.__firebase_config = JSON.stringify({
                         <img class="absolute inset-0 w-full h-full object-contain transition-transform group-hover:scale-105" src="${v.thumbnail}">
                         ${userFavorites.includes(v.id) ? '<i data-lucide="heart" class="absolute top-1 left-1 w-3.5 h-3.5 text-rose-400 fill-rose-400 z-10"></i>' : ''}
                         ${userSaved.includes(v.id) ? '<i data-lucide="bookmark" class="absolute top-1 right-1 w-3.5 h-3.5 text-amber-400 fill-amber-400 z-10"></i>' : ''}
+                        ${isNewV ? '<span class="absolute bottom-1 left-1 bg-brandAccent text-white text-[8px] font-black px-1 rounded z-10">NEW</span>' : ''}
+                        ${prog > 0 ? `<div class="absolute bottom-0 left-0 right-0 h-[3px] bg-white/25 z-10"><div class="h-full bg-brandAccent" style="width:${Math.round(prog * 100)}%"></div></div>` : ''}
                         <span class="absolute bottom-1 right-1 bg-black/80 text-[9px] px-1 rounded font-mono text-white z-10 flex items-center gap-1">
                             ${isImage ? '<i data-lucide="image" class="w-2.5 h-2.5"></i>' : ''}${v.duration}
                         </span>
@@ -3394,7 +4113,12 @@ window.__firebase_config = JSON.stringify({
             };
 
             player.addEventListener("ended", () => {
-                if (appConfig.autoNext) {
+                if (sleepAtEnd) {
+                    sleepAtEnd = false;
+                    sleepMinutes = 0;
+                    updateToolsUI();
+                    showToast("スリープタイマーで停止しました", "system");
+                } else if (appConfig.autoNext) {
                     const nextId = getNextVideoId();
                     if (nextId) {
                         showToast("次の動画を再生します", "autoNext");
