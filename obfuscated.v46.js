@@ -517,7 +517,7 @@ const APP_LAYOUT_HTML = String.raw`
                     <button onclick="document.getElementById('importFileInput').click()" class="text-xs bg-brandSurface border border-brandBorder hover:border-brandAccent text-brandText px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1">
                         <i data-lucide="upload" class="w-3.5 h-3.5"></i> 読込
                     </button>
-                    <input type="file" id="importFileInput" accept="application/json" class="hidden" onchange="importUserData(this)">
+                    <input type="file" id="importFileInput" class="hidden" onchange="importUserData(this)">
                 </div>
 
                 <div class="flex items-center justify-between p-3 border border-red-900/50 rounded bg-brandBg h-11 sm:col-span-2">
@@ -1242,19 +1242,210 @@ window.__firebase_config = JSON.stringify({
             return filtered[idx + 1].id;
         }
 
+        // ================= GVN Pack(独自のバックアップ形式) =================
+        // JSON → UTF-8 → 独自LZW圧縮 → 鍵ストリーム+連鎖で攪拌 → ヘッダ付与 → 独自アルファベットのBase64風テキスト
+        // 注意: 難読化であり、暗号としての安全性はありません(復号に必要な情報がこのJS内にあるため)
+        const GVN_PACK_HEAD = '<<GVN-PACK:1>>';
+        const GVN_PACK_SECRET = 'GVN.ORG//pack//v1//k9Qz7!rT2^mXw4Lp';
+        const GVN_PACK_MAGIC = [0x47, 0x56, 0x4E, 0x50];
+        const GVN_PACK_ALPHABET = (() => {
+            const base = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'.split('');
+            const rng = gvnRng(0x47564E31);
+            for (let i = base.length - 1; i > 0; i--) {
+                const j = rng() % (i + 1);
+                const t = base[i]; base[i] = base[j]; base[j] = t;
+            }
+            return base.join('');
+        })();
+
+        function gvnRng(seed) {
+            let a = seed >>> 0;
+            return function () {
+                a = (a + 0x6D2B79F5) >>> 0;
+                let t = a;
+                t = Math.imul(t ^ (t >>> 15), t | 1);
+                t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+                return (t ^ (t >>> 14)) >>> 0;
+            };
+        }
+
+        function gvnHash(bytes) {
+            let h = 0x811C9DC5;
+            for (let i = 0; i < bytes.length; i++) {
+                h ^= bytes[i];
+                h = Math.imul(h, 0x01000193) >>> 0;
+            }
+            return h >>> 0;
+        }
+
+        function gvnLzwEncode(input) {
+            const dict = new Map();
+            for (let i = 0; i < 256; i++) dict.set(String.fromCharCode(i), i);
+            let next = 256;
+            let w = '';
+            const codes = [];
+            for (let i = 0; i < input.length; i++) {
+                const c = String.fromCharCode(input[i]);
+                const wc = w + c;
+                if (dict.has(wc)) {
+                    w = wc;
+                } else {
+                    codes.push(dict.get(w));
+                    if (next < 65535) dict.set(wc, next++);
+                    w = c;
+                }
+            }
+            if (w !== '') codes.push(dict.get(w));
+            const out = new Uint8Array(codes.length * 2);
+            for (let i = 0; i < codes.length; i++) {
+                out[i * 2] = codes[i] >> 8;
+                out[i * 2 + 1] = codes[i] & 255;
+            }
+            return out;
+        }
+
+        function gvnLzwDecode(bytes) {
+            if (bytes.length % 2 !== 0) throw new Error('壊れたデータです');
+            const dict = [];
+            for (let i = 0; i < 256; i++) dict.push([i]);
+            const out = [];
+            let w = null;
+            for (let i = 0; i < bytes.length; i += 2) {
+                const k = (bytes[i] << 8) | bytes[i + 1];
+                let entry;
+                if (k < dict.length) entry = dict[k];
+                else if (k === dict.length && w) entry = w.concat(w[0]);
+                else throw new Error('壊れたデータです');
+                for (let j = 0; j < entry.length; j++) out.push(entry[j]);
+                if (w && dict.length < 65535) dict.push(w.concat(entry[0]));
+                w = entry;
+            }
+            return Uint8Array.from(out);
+        }
+
+        function gvnScramble(bytes, salt, decode) {
+            const secret = new TextEncoder().encode(GVN_PACK_SECRET);
+            const seedBytes = new Uint8Array(secret.length + salt.length);
+            seedBytes.set(secret, 0);
+            seedBytes.set(salt, secret.length);
+            const rng = gvnRng(gvnHash(seedBytes));
+            const out = new Uint8Array(bytes.length);
+            let prev = 0;
+            for (let i = 0; i < bytes.length; i++) {
+                const k = rng() >>> 24;
+                if (!decode) {
+                    const c = (((bytes[i] ^ k) + prev + (i * 31)) & 255);
+                    out[i] = c;
+                    prev = c;
+                } else {
+                    out[i] = (((bytes[i] - prev - (i * 31)) & 255) ^ k);
+                    prev = bytes[i];
+                }
+            }
+            return out;
+        }
+
+        function gvnB64Encode(bytes) {
+            const A = GVN_PACK_ALPHABET;
+            let out = '';
+            let i = 0;
+            for (; i + 2 < bytes.length; i += 3) {
+                const n = (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2];
+                out += A[(n >> 18) & 63] + A[(n >> 12) & 63] + A[(n >> 6) & 63] + A[n & 63];
+            }
+            const rem = bytes.length - i;
+            if (rem === 1) {
+                const n = bytes[i] << 16;
+                out += A[(n >> 18) & 63] + A[(n >> 12) & 63];
+            } else if (rem === 2) {
+                const n = (bytes[i] << 16) | (bytes[i + 1] << 8);
+                out += A[(n >> 18) & 63] + A[(n >> 12) & 63] + A[(n >> 6) & 63];
+            }
+            return out;
+        }
+
+        function gvnB64Decode(str) {
+            const idx = {};
+            for (let i = 0; i < GVN_PACK_ALPHABET.length; i++) idx[GVN_PACK_ALPHABET[i]] = i;
+            const clean = str.replace(/\s+/g, '');
+            if (clean.length % 4 === 1) throw new Error('壊れたデータです');
+            const out = [];
+            for (let i = 0; i < clean.length; i += 4) {
+                const chunk = clean.slice(i, i + 4);
+                const v = [];
+                for (let j = 0; j < chunk.length; j++) {
+                    const x = idx[chunk[j]];
+                    if (x === undefined) throw new Error('壊れたデータです');
+                    v.push(x);
+                }
+                const n = ((v[0] << 18) | (v[1] << 12) | ((v[2] || 0) << 6) | (v[3] || 0));
+                out.push((n >> 16) & 255);
+                if (v.length > 2) out.push((n >> 8) & 255);
+                if (v.length > 3) out.push(n & 255);
+            }
+            return Uint8Array.from(out);
+        }
+
+        function gvnPackEncode(obj) {
+            const raw = new TextEncoder().encode(JSON.stringify(obj));
+            const packed = gvnLzwEncode(raw);
+            const salt = new Uint8Array(4);
+            if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(salt);
+            else for (let i = 0; i < 4; i++) salt[i] = Math.floor(Math.random() * 256);
+            const body = gvnScramble(packed, salt, false);
+            const checksum = gvnHash(packed);
+            const head = new Uint8Array(17);
+            head.set(GVN_PACK_MAGIC, 0);
+            head[4] = 1;
+            head.set(salt, 5);
+            head[9] = (raw.length >>> 24) & 255; head[10] = (raw.length >>> 16) & 255; head[11] = (raw.length >>> 8) & 255; head[12] = raw.length & 255;
+            head[13] = (checksum >>> 24) & 255; head[14] = (checksum >>> 16) & 255; head[15] = (checksum >>> 8) & 255; head[16] = checksum & 255;
+            const all = new Uint8Array(head.length + body.length);
+            all.set(head, 0);
+            all.set(body, head.length);
+            const text = gvnB64Encode(all);
+            const lines = text.match(/.{1,64}/g) || [];
+            return GVN_PACK_HEAD + '\n' + lines.join('\n') + '\n';
+        }
+
+        function gvnPackDecode(text) {
+            const t = String(text || '').trim();
+            if (!t.startsWith(GVN_PACK_HEAD)) throw new Error('GVN Pack形式のファイルではありません');
+            const all = gvnB64Decode(t.slice(GVN_PACK_HEAD.length));
+            if (all.length < 17) throw new Error('壊れたデータです');
+            for (let i = 0; i < 4; i++) if (all[i] !== GVN_PACK_MAGIC[i]) throw new Error('GVN Pack形式のファイルではありません');
+            if (all[4] !== 1) throw new Error('未対応のバージョンです');
+            const salt = all.slice(5, 9);
+            const rawLen = ((all[9] << 24) | (all[10] << 16) | (all[11] << 8) | all[12]) >>> 0;
+            const checksum = ((all[13] << 24) | (all[14] << 16) | (all[15] << 8) | all[16]) >>> 0;
+            const packed = gvnScramble(all.slice(17), salt, true);
+            if (gvnHash(packed) !== checksum) throw new Error('ファイルが壊れているか、書き換えられています');
+            const raw = gvnLzwDecode(packed);
+            if (raw.length !== rawLen) throw new Error('ファイルが壊れています');
+            return JSON.parse(new TextDecoder().decode(raw));
+        }
+
+        // バックアップに含めない・読み込まない項目(ログイン情報や一時データ)
+        function isBackupExcludedKey(key) {
+            return key.startsWith('session_') || key === 'pending_link';
+        }
+
         function exportUserData() {
             const data = {};
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
                 if (key && key.startsWith(STORAGE_PREFIX)) {
-                    data[key.slice(STORAGE_PREFIX.length)] = localStorage.getItem(key);
+                    const shortKey = key.slice(STORAGE_PREFIX.length);
+                    if (isBackupExcludedKey(shortKey)) continue;
+                    data[shortKey] = localStorage.getItem(key);
                 }
             }
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const payload = { app: 'GVN', site: window.APP_UNIQUE_ID, exportedAt: Date.now(), data: data };
+            const blob = new Blob([gvnPackEncode(payload)], { type: 'application/octet-stream' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${window.APP_UNIQUE_ID}_backup_${new Date().toISOString().slice(0,10)}.json`;
+            a.download = `${window.APP_UNIQUE_ID}_backup_${new Date().toISOString().slice(0,10)}.gvn`;
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -1268,14 +1459,26 @@ window.__firebase_config = JSON.stringify({
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
-                    const data = JSON.parse(e.target.result);
-                    Object.keys(data).forEach(key => {
-                        localStorage.setItem(STORAGE_PREFIX + key, data[key]);
+                    const text = String(e.target.result || '');
+                    let payload;
+                    if (text.trim().startsWith('{')) {
+                        // 以前のJSON形式のバックアップ
+                        payload = { site: window.APP_UNIQUE_ID, data: JSON.parse(text) };
+                    } else {
+                        payload = gvnPackDecode(text);
+                    }
+                    if (!payload || typeof payload.data !== 'object' || payload.data === null) throw new Error('データがありません');
+                    if (payload.site && payload.site !== window.APP_UNIQUE_ID) {
+                        if (!confirm(`別のサイト(${payload.site})のバックアップです。読み込みますか?`)) return;
+                    }
+                    Object.keys(payload.data).forEach(key => {
+                        if (isBackupExcludedKey(key)) return;
+                        localStorage.setItem(STORAGE_PREFIX + key, String(payload.data[key]));
                     });
                     showToast("データを読み込みました。再読み込みします", "data");
                     setTimeout(() => location.reload(), 1000);
                 } catch (err) {
-                    showToast("ファイルの読み込みに失敗しました", "data");
+                    showToast("ファイルの読み込みに失敗しました(" + (err && err.message ? err.message : '形式エラー') + ")", "data");
                 }
             };
             reader.readAsText(file);
