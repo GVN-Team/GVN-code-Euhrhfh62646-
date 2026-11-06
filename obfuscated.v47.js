@@ -899,6 +899,23 @@ const APP_LAYOUT_HTML = String.raw`
     body.insertAdjacentHTML('afterbegin', APP_LAYOUT_HTML);
 })();
 
+// ブックマーク・ホーム画面・タブ用のアイコンを全サイト共通で設定する(各サイトのindex.htmlに書かなくてよい)
+(function ensureSiteIcons() {
+    try {
+        const base = 'https://pub-79a6c6cc78c146739a6140aee2f59bc2.r2.dev/Image/';
+        const head = document.head;
+        head.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]').forEach((l) => l.remove());
+        const add = (attrs) => {
+            const l = document.createElement('link');
+            Object.keys(attrs).forEach((k) => l.setAttribute(k, attrs[k]));
+            head.appendChild(l);
+        };
+        add({ rel: 'apple-touch-icon', href: base + 'apple-touch-icon_a0d5f87d.png' });
+        add({ rel: 'icon', href: base + 'favicon_6f31e306.ico', sizes: 'any' });
+        add({ rel: 'icon', type: 'image/png', sizes: '192x192', href: base + 'icon-192_1a004a02.png' });
+    } catch (e) {}
+})();
+
 window.__firebase_config = JSON.stringify({
     apiKey: "AIzaSyCMct_8D2DIqRifQIOsapJxRZah53o5RVs",
     authDomain: "gvn-org-cloud.firebaseapp.com",
