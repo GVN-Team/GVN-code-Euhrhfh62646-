@@ -159,7 +159,10 @@ const APP_LAYOUT_HTML = String.raw`
                             </div>
 
                             <div class="flex items-center gap-1.5 sm:gap-4">
-                                <button id="toolsBtn" onclick="toggleToolsMenu(event)" class="p-2 text-white hover:text-brandAccent transition-colors flex items-center justify-center min-w-[40px] min-h-[40px] active:scale-90" title="ツール">
+                                <button id="airplayBtn" onclick="showAirPlayPicker()" class="hidden p-2 text-white hover:text-brandAccent transition-colors flex items-center justify-center min-w-[40px] min-h-[40px] active:scale-90" title="AirPlay">
+                            <i data-lucide="airplay" class="w-5 h-5"></i>
+                        </button>
+                        <button id="toolsBtn" onclick="toggleToolsMenu(event)" class="p-2 text-white hover:text-brandAccent transition-colors flex items-center justify-center min-w-[40px] min-h-[40px] active:scale-90" title="ツール">
                             <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
                         </button>
                         <button id="theaterBtn" onclick="toggleTheaterMode()" class="p-2 text-white hover:text-brandAccent transition-colors hidden sm:flex items-center justify-center min-w-[40px] min-h-[40px]" title="大画面モード切替 (T)">
@@ -174,6 +177,7 @@ const APP_LAYOUT_HTML = String.raw`
                             </div>
                         </div>
                     </div>
+                    <div id="speedIndicator" class="hidden absolute top-4 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs font-black px-3 py-1.5 rounded-full z-40 pointer-events-none">2倍速 ▶▶</div>
                     <div id="toolsMenu" class="hidden absolute right-2 bottom-24 sm:bottom-28 w-64 max-w-[calc(100%-1rem)] max-h-[70%] overflow-y-auto bg-black/90 border border-white/15 rounded-2xl p-4 z-50 space-y-4 text-white shadow-2xl" onclick="event.stopPropagation()">
                         <div>
                             <div class="flex items-center justify-between mb-2"><span class="text-[11px] font-black tracking-wider">スリープタイマー</span><span id="sleepStatus" class="text-[10px] text-brandAccent font-mono"></span></div>
@@ -261,10 +265,6 @@ const APP_LAYOUT_HTML = String.raw`
                     </h2>
                     
                     <div class="flex items-center gap-2">
-                        <button id="addVideoBtn" onclick="openAddVideoModal()" class="hidden text-[11px] text-brandAccent hover:text-brandText bg-brandSurface px-3 py-2 rounded-xl border border-brandBorder transition-colors flex items-center gap-1.5 font-bold active:scale-95">
-                            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-                            <span>追加</span>
-                        </button>
                         <button id="randomBtn" onclick="playRandom()" title="ランダム再生" class="text-[11px] text-brandMuted hover:text-brandText bg-brandSurface px-3 py-2 rounded-xl border border-brandBorder transition-colors flex items-center gap-1.5 font-bold active:scale-95">
                             <i data-lucide="shuffle" class="w-3.5 h-3.5"></i>
                             <span>ランダム</span>
@@ -290,11 +290,13 @@ const APP_LAYOUT_HTML = String.raw`
                     <button id="searchClearBtn" onclick="clearSearch()" class="hidden absolute right-3 text-brandMuted hover:text-brandText transition-colors p-1">
                         <i data-lucide="x" class="w-4 h-4"></i>
                     </button>
+                    <div id="searchHistoryBox" class="hidden absolute left-0 right-0 top-full mt-1 z-30 bg-brandSurface border border-brandBorder rounded-xl overflow-hidden shadow-xl"></div>
                 </div>
 
                 <select id="monthFilter" onchange="setMonthFilter(this.value)" class="w-full bg-brandSurface border border-brandBorder rounded-xl px-3 py-2.5 text-xs text-brandText font-bold focus:border-brandAccent focus:outline-none transition-colors">
                     <option value="">すべての月</option>
                 </select>
+                <div id="tagChips" class="hidden flex gap-2 overflow-x-auto pb-1 scrollbar-thin"></div>
 
                 <div id="playlist" class="space-y-3"></div>
             </aside>
@@ -829,55 +831,6 @@ const APP_LAYOUT_HTML = String.raw`
             <div class="pt-3 border-t border-brandBorder flex-shrink-0">
                 <button onclick="closeModal()" class="w-full py-3 bg-brandBg border border-brandBorder hover:border-brandAccent active:scale-95 transition-all text-brandText rounded-xl text-xs font-bold min-h-[44px]">閉じる</button>
             </div>
-        </div>
-    </div>
-
-        <div id="addVideoModal" class="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 hidden">
-        <div class="bg-brandSurface border border-brandBorder rounded-theme max-w-md w-full max-h-[85vh] flex flex-col p-6 shadow-2xl">
-            <div class="flex justify-between items-center pb-3 border-b border-brandBorder flex-shrink-0">
-                <h3 class="text-lg font-bold text-brandText flex items-center gap-2"><i data-lucide="plus-circle" class="text-brandAccent"></i><span>動画・画像を追加</span></h3>
-                <button onclick="closeAddVideoModal()" class="text-brandMuted hover:text-brandText transition-colors p-2"><i data-lucide="x" class="w-5 h-5"></i></button>
-            </div>
-            <form id="addVideoForm" onsubmit="submitAddVideo(event)" class="overflow-y-auto flex-grow py-4 pr-1 space-y-3 scrollbar-thin">
-                <div>
-                    <label class="text-[11px] font-bold text-brandMuted block mb-1">タイプ</label>
-                    <select id="addVideoType" onchange="toggleAddVideoFields()" class="w-full bg-brandBg border border-brandBorder rounded-xl px-3 py-2.5 text-xs text-brandText focus:border-brandAccent focus:outline-none">
-                        <option value="video">動画</option>
-                        <option value="image">画像</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="text-[11px] font-bold text-brandMuted block mb-1">タイトル</label>
-                    <input type="text" id="addVideoTitle" required class="w-full bg-brandBg border border-brandBorder rounded-xl px-3 py-2.5 text-xs text-brandText focus:border-brandAccent focus:outline-none">
-                </div>
-                <div id="addVideoUrlField">
-                    <label class="text-[11px] font-bold text-brandMuted block mb-1">動画URL</label>
-                    <input type="text" id="addVideoUrl" class="w-full bg-brandBg border border-brandBorder rounded-xl px-3 py-2.5 text-xs text-brandText focus:border-brandAccent focus:outline-none">
-                </div>
-                <div id="addVideoImagesField" class="hidden">
-                    <label class="text-[11px] font-bold text-brandMuted block mb-1">画像URL(1行に1つ)</label>
-                    <textarea id="addVideoImages" rows="3" class="w-full bg-brandBg border border-brandBorder rounded-xl px-3 py-2.5 text-xs text-brandText focus:border-brandAccent focus:outline-none"></textarea>
-                </div>
-                <div>
-                    <label class="text-[11px] font-bold text-brandMuted block mb-1">サムネイルURL</label>
-                    <input type="text" id="addVideoThumbnail" required class="w-full bg-brandBg border border-brandBorder rounded-xl px-3 py-2.5 text-xs text-brandText focus:border-brandAccent focus:outline-none">
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="text-[11px] font-bold text-brandMuted block mb-1">再生時間/枚数表記</label>
-                        <input type="text" id="addVideoDuration" placeholder="例: 0:25 / 8枚" required class="w-full bg-brandBg border border-brandBorder rounded-xl px-3 py-2.5 text-xs text-brandText focus:border-brandAccent focus:outline-none">
-                    </div>
-                    <div>
-                        <label class="text-[11px] font-bold text-brandMuted block mb-1">日付</label>
-                        <input type="text" id="addVideoDate" placeholder="2026/10/02" required class="w-full bg-brandBg border border-brandBorder rounded-xl px-3 py-2.5 text-xs text-brandText focus:border-brandAccent focus:outline-none">
-                    </div>
-                </div>
-                <div>
-                    <label class="text-[11px] font-bold text-brandMuted block mb-1">説明</label>
-                    <textarea id="addVideoDesc" rows="2" class="w-full bg-brandBg border border-brandBorder rounded-xl px-3 py-2.5 text-xs text-brandText focus:border-brandAccent focus:outline-none"></textarea>
-                </div>
-                <button type="submit" class="w-full py-3 bg-brandAccent active:scale-95 transition-all text-black rounded-xl text-xs font-bold min-h-[44px]">追加する</button>
-            </form>
         </div>
     </div>
 
@@ -1514,7 +1467,7 @@ window.__firebase_config = JSON.stringify({
             const recentHtml = recent.length > 0 ? recent.map(v => `
                 <div onclick="closeMyPage(); loadMedia(${v.id});" class="cursor-pointer group">
                     <div class="aspect-video rounded-lg overflow-hidden border border-brandBorder relative bg-brandBg">
-                        <img src="${v.thumbnail}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" alt="">
+                        <img src="${mediaUrl(v.thumbnail)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" alt="">
                         <span class="absolute bottom-1 right-1 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded font-bold">${v.duration || ''}</span>
                     </div>
                     <p class="text-[11px] text-brandText font-bold mt-1 truncate">${v.title || '(無題)'}</p>
@@ -1753,6 +1706,7 @@ window.__firebase_config = JSON.stringify({
                 const memberData = await guildMemberRes.json();
                 await setStep('ロールを確認しています');
                 const hasRole = memberData.roles && memberData.roles.some(role => String(role) === String(DISCORD_CONFIG["role-id"]));
+                        try { setStoredData('session_discord_roles', (memberData.roles || []).map(String)); } catch (e) {}
 
                 if (hasRole) {
                     await setStep('ログイン情報を保存しています');
@@ -1794,7 +1748,6 @@ window.__firebase_config = JSON.stringify({
             setupDoubleTapGestures();
             setupAutoFadeControls();
             setupImageSwipeEvents();
-            window.addEventListener('hashchange', updateAddVideoButtonVisibility);
         }
 
 
@@ -1871,6 +1824,7 @@ window.__firebase_config = JSON.stringify({
                     try {
                         setStoredData('session_account_key', await accountKeyFromCredentials(data.username || userInp.value, passInp.value));
                     } catch (e) {}
+                    if (data.token) setStoredData('session_auth_token', data.token);
                     setStoredData('session_user', data.username);
                     setStoredData('session_avatar', "");
                     applyLoginState(data.username, "");
@@ -1910,7 +1864,6 @@ window.__firebase_config = JSON.stringify({
 
             window.currentUser = currentUser;
             window.currentUserDiscordId = currentUserDiscordId;
-            updateAddVideoButtonVisibility();
             
             if (window.db && window.getAuthUser && window.getAuthUser()) {
                 syncUserDataFromCloud(); 
@@ -1931,55 +1884,10 @@ window.__firebase_config = JSON.stringify({
             const mainContent = document.getElementById('mainContent');
             mainContent.classList.remove('hidden');
             mainContent.classList.add('flex');
+            downloadCfgReady = refreshDownloadCfg(true);
             initPlayer();
             initVideosFromFirestore();
             loadSavesForAccount();
-        }
-
-        async function syncUserDataFromCloud() {
-            if (!currentUser) return;
-            const authUser = window.getAuthUser ? window.getAuthUser() : null;
-            if (!window.db || !authUser) return;
-
-            try {
-                const docRef = window.doc(window.db, 'artifacts', window.appId, 'users', authUser.uid, 'userData', currentUser);
-                const docSnap = await window.getDoc(docRef);
-
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    if (Array.isArray(data.history)) userWatchHistory = data.history;
-                    if (data.resumeTimes) userResumeTimes = data.resumeTimes;
-                    
-                    setStoredData('history_' + currentUser, userWatchHistory);
-                    setStoredData('favorites_' + currentUser, userFavorites);
-                    setStoredData('resumes_' + currentUser, userResumeTimes);
-
-                    updateFavoriteBtnUI();
-                    renderPlaylist();
-                } else {
-                    saveUserDataToCloud();
-                }
-            } catch (err) {}
-        }
-
-        async function saveUserDataToCloud() {
-            if (!currentUser) return;
-            setStoredData('history_' + currentUser, userWatchHistory);
-            setStoredData('favorites_' + currentUser, userFavorites);
-            setStoredData('resumes_' + currentUser, userResumeTimes);
-
-            const authUser = window.getAuthUser ? window.getAuthUser() : null;
-            if (!window.db || !authUser) return;
-
-            try {
-                const docRef = window.doc(window.db, 'artifacts', window.appId, 'users', authUser.uid, 'userData', currentUser);
-                await window.setDoc(docRef, {
-                    username: currentUser,
-                    history: userWatchHistory,
-                    resumeTimes: userResumeTimes,
-                    updatedAt: new Date().toISOString()
-                }, { merge: true });
-            } catch (err) {}
         }
 
         function toggleUserMenu(e) {
@@ -2017,6 +1925,8 @@ window.__firebase_config = JSON.stringify({
                 localStorage.removeItem(STORAGE_PREFIX + 'session_token_checked_at');
                 localStorage.removeItem(STORAGE_PREFIX + 'session_discord_id');
                 localStorage.removeItem(STORAGE_PREFIX + 'session_account_key');
+                localStorage.removeItem(STORAGE_PREFIX + 'session_auth_token');
+                localStorage.removeItem(STORAGE_PREFIX + 'session_discord_roles');
                 localStorage.removeItem(STORAGE_PREFIX + 'session_discord_username');
             } catch (e) {}
 
@@ -2030,6 +1940,10 @@ window.__firebase_config = JSON.stringify({
             userSaved = [];
             savesReady = false;
             userResumeTimes = {};
+            syncPulled = false;
+            downloadCfg = null;
+            downloadCfgSettled = false;
+            signedMedia.clear();
 
             // 3) 後始末(失敗しても無視)
             try { clearInterval(dotInterval); } catch (e) {}
@@ -2099,7 +2013,7 @@ window.__firebase_config = JSON.stringify({
                     };
                     el.innerHTML = `
                         <div class="flex items-center gap-3 min-w-0">
-                            <img src="${v.thumbnail}" class="w-16 h-10 object-contain bg-black rounded border border-brandBorder flex-shrink-0">
+                            <img src="${mediaUrl(v.thumbnail)}" class="w-16 h-10 object-contain bg-black rounded border border-brandBorder flex-shrink-0">
                             <div class="min-w-0">
                                 <p class="text-xs font-bold text-brandText truncate">${v.title}</p>
                                 <p class="text-[10px] text-brandMuted">${item.watchedAt}</p>
@@ -2163,7 +2077,7 @@ window.__firebase_config = JSON.stringify({
                     el.className = "flex items-center justify-between p-3 bg-brandBg rounded-xl border border-brandBorder";
                     el.innerHTML = `
                         <div class="flex items-center gap-3 min-w-0 cursor-pointer flex-grow" onclick="loadMedia(${v.id}); closeFavoritesModal();">
-                            <img src="${v.thumbnail}" class="w-16 h-10 object-contain bg-black rounded border border-brandBorder flex-shrink-0">
+                            <img src="${mediaUrl(v.thumbnail)}" class="w-16 h-10 object-contain bg-black rounded border border-brandBorder flex-shrink-0">
                             <div class="min-w-0">
                                 <p class="text-xs font-bold text-brandText truncate">${v.title}</p>
                                 <p class="text-[10px] text-brandMuted">${v.duration}</p>
@@ -2379,7 +2293,7 @@ window.__firebase_config = JSON.stringify({
                     el.className = "flex items-center justify-between p-3 bg-brandBg rounded-xl border border-brandBorder";
                     el.innerHTML = `
                         <div class="flex items-center gap-3 min-w-0 cursor-pointer flex-grow" onclick="loadMedia(${v.id}); closeSavesModal();">
-                            <img src="${v.thumbnail}" class="w-16 h-10 object-contain bg-black rounded border border-brandBorder flex-shrink-0">
+                            <img src="${mediaUrl(v.thumbnail)}" class="w-16 h-10 object-contain bg-black rounded border border-brandBorder flex-shrink-0">
                             <div class="min-w-0">
                                 <p class="text-xs font-bold text-brandText truncate">${v.title}</p>
                                 <p class="text-[10px] text-brandMuted">${v.duration}</p>
@@ -2534,7 +2448,7 @@ window.__firebase_config = JSON.stringify({
                 const th = document.createElement('div');
                 th.className = 'relative w-36 h-20 bg-black rounded-xl overflow-hidden border border-brandBorder';
                 const img = document.createElement('img');
-                img.src = v.thumbnail || '';
+                img.src = mediaUrl(v.thumbnail) || '';
                 img.className = 'absolute inset-0 w-full h-full object-contain';
                 th.appendChild(img);
                 const title = document.createElement('p');
@@ -2660,7 +2574,11 @@ window.__firebase_config = JSON.stringify({
             try {
                 const ctrl = new AbortController();
                 const timer = setTimeout(() => ctrl.abort(), 8000);
-                const res = await fetch(url, { method: 'HEAD', mode: 'cors', signal: ctrl.signal });
+                // 署名付きURLはHEADでは通らないため、先頭1バイトだけGETで確認する
+                const signedUrl = /X-Amz-Signature=/.test(url);
+                const res = await fetch(url, signedUrl
+                    ? { method: 'GET', headers: { Range: 'bytes=0-0' }, mode: 'cors', signal: ctrl.signal }
+                    : { method: 'HEAD', mode: 'cors', signal: ctrl.signal });
                 clearTimeout(timer);
                 return res.ok;
             } catch (e) {
@@ -2681,7 +2599,7 @@ window.__firebase_config = JSON.stringify({
                 if (boostCtx.resume) boostCtx.resume().catch(() => {});
             }
             if (!boostRouted) {
-                if (!(await hostAllowsCors(cur.url))) {
+                if (!(await hostAllowsCors(currentPlayUrl || cur.url))) {
                     showToast("この動画の配信元がCORSを許可していないため、音量ブーストは使えません", "system");
                     return;
                 }
@@ -2729,7 +2647,8 @@ window.__firebase_config = JSON.stringify({
         // ブースト使用後は音声がWebAudio経由になる。CORS非対応の動画だと無音になるため、その場合は再読み込みで戻す
         async function verifyBoostCompat(v) {
             if (!boostRouted || !v || v.type === 'image' || v.images) return;
-            const ok = await hostAllowsCors(v.url);
+            const signedPlay = signedMedia.get(v.url);
+            const ok = await hostAllowsCors((signedPlay && signedPlay.url) || v.url);
             if (ok || activeId !== v.id) return;
             showToast("この動画は音量ブースト後に音が出ないため、ページを再読み込みします", "system");
             setStoredData(PENDING_LINK_KEY, { v: v.id, t: 0, ts: Date.now() });
@@ -2774,7 +2693,7 @@ window.__firebase_config = JSON.stringify({
             let blob = null;
             try { blob = await frameToBlob(player); } catch (e) { blob = null; }
             if (!blob) {
-                try { blob = await frameViaCorsVideo(v.url, t); } catch (e) { blob = null; }
+                try { blob = await frameViaCorsVideo(currentPlayUrl || v.url, t); } catch (e) { blob = null; }
             }
             if (!blob) {
                 showToast("撮影できませんでした(動画の配信元がCORSを許可していない可能性があります)", "system");
@@ -3068,10 +2987,465 @@ window.__firebase_config = JSON.stringify({
             }
         }
 
+        // ================= 動画URLの保護(期限付きURL) =================
+        let downloadCfg = null;
+        let downloadCfgAt = 0;
+        let downloadCfgSettled = false;
+        let downloadCfgReady = null;
+        let currentPlayUrl = '';
+        const signedMedia = new Map();
+        let thumbSigning = false;
+        let thumbFailAt = 0;
+
+        async function refreshDownloadCfg(force) {
+            if (!force && downloadCfgSettled && Date.now() - downloadCfgAt < 5 * 60000) return downloadCfg;
+            try { downloadCfg = await fetchDownloadPermissions(); } catch (e) { /* 取得できなければ以前の値のまま */ }
+            downloadCfgAt = Date.now();
+            downloadCfgSettled = true;
+            if (videos.length > 0) renderPlaylist();
+            return downloadCfg;
+        }
+
+        function gateOn() {
+            return !!(downloadCfg && downloadCfg.gate === true && String(AUTH_SERVER_URL || '').trim());
+        }
+
+        function gateCredentials() {
+            const discordId = currentUserDiscordId || getStoredData('session_discord_id', '');
+            if (discordId) {
+                const t = getStoredData('session_token', null);
+                return t ? { discordToken: t } : null;
+            }
+            const tk = getStoredData('session_auth_token', '');
+            return tk ? { token: tk } : null;
+        }
+
+        async function signMediaUrls(urls, mode) {
+            const cred = gateCredentials();
+            if (!cred) { const e = new Error('NO_CRED'); e.code = 'NO_CRED'; throw e; }
+            const base = String(AUTH_SERVER_URL || '').trim().replace(/\/+$/, '');
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 60000);
+            let res;
+            try {
+                res = await fetch(base + '/sign', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(Object.assign({ siteId: window.APP_UNIQUE_ID, urls: urls, mode: mode }, cred)),
+                    signal: ctrl.signal
+                });
+            } catch (e) {
+                const err = new Error('NETWORK'); err.code = 'NETWORK'; throw err;
+            } finally { clearTimeout(timer); }
+            let json = null;
+            try { json = await res.json(); } catch (e) {}
+            if (!res.ok || !json || !json.success) {
+                const err = new Error((json && json.error) || ('HTTP ' + res.status));
+                err.code = (json && json.error) || 'HTTP';
+                err.status = res.status;
+                throw err;
+            }
+            return json;
+        }
+
+        function gateErrorMessage(err) {
+            const code = err && err.code;
+            if (code === 'NO_CRED') return "一度ログアウトして、もう一度ログインしてください";
+            if (code === 'download-denied') return "ダウンロード権限が不足しています";
+            if (code === 'no-role') return "この動画を見る権限がありません";
+            if (code === 'unauthorized') return "ログインの有効期限が切れました。もう一度ログインしてください";
+            if (code === 'NETWORK') return "認証サーバーに接続できませんでした";
+            return "動画のURLを取得できませんでした (" + ((err && err.message) || '不明') + ")";
+        }
+
+        function mediaUrl(u) {
+            if (!u) return u;
+            const h = signedMedia.get(u);
+            return (h && h.exp > Date.now()) ? h.url : u;
+        }
+
+        async function ensureSigned(urls) {
+            const need = urls.filter(u => { const h = signedMedia.get(u); return !h || h.exp - Date.now() < 10 * 60000; });
+            if (need.length === 0) return;
+            const json = await signMediaUrls(need, 'play');
+            json.urls.forEach((u, i) => signedMedia.set(need[i], { url: u, exp: json.signed[i] ? json.expiresAt : Infinity }));
+        }
+
+        function maybeSignThumbnails() {
+            if (!gateOn() || thumbSigning || Date.now() - thumbFailAt < 60000) return;
+            const need = [];
+            videos.forEach(v => {
+                if (!v.thumbnail) return;
+                const h = signedMedia.get(v.thumbnail);
+                if (!h || h.exp - Date.now() < 30 * 60000) need.push(v.thumbnail);
+            });
+            const urls = Array.from(new Set(need)).slice(0, 500);
+            if (urls.length === 0) return;
+            thumbSigning = true;
+            signMediaUrls(urls, 'play').then(json => {
+                json.urls.forEach((u, i) => signedMedia.set(urls[i], { url: u, exp: json.signed[i] ? json.expiresAt : Infinity }));
+                renderPlaylist();
+            }).catch(() => { thumbFailAt = Date.now(); }).finally(() => { thumbSigning = false; });
+        }
+
+        async function loadGatedImages(v) {
+            if (!gateOn()) { setupImageViewer(v.images); return; }
+            try { await ensureSigned(v.images); } catch (err) { showToast(gateErrorMessage(err), "system"); }
+            if (activeId === v.id) setupImageViewer(v.images);
+        }
+
+        async function resolvePlayUrl(v) {
+            const json = await signMediaUrls([v.url], 'play');
+            signedMedia.set(v.url, { url: json.urls[0], exp: json.signed[0] ? json.expiresAt : Infinity });
+            return json.urls[0];
+        }
+
+        function attachVideoSource(v, autoPlayNow) {
+            const apply = (url) => {
+                if (activeId !== v.id) return;
+                currentPlayUrl = url;
+                playerSrc.src = url;
+                player.load();
+            };
+            const deferred = (factory) => {
+                playerSrc.removeAttribute('src');
+                player.load();
+                factory().then((url) => {
+                    if (activeId !== v.id) return;
+                    apply(url);
+                    // 非同期で読み込んだ場合は、最初の再生開始が間に合わないのでここで再生する
+                    if (autoPlayNow && document.getElementById('resumeModal').classList.contains('hidden')) {
+                        player.play().then(() => {
+                            playBtn.innerHTML = `<i data-lucide="pause" class="w-6 h-6 fill-current"></i>`;
+                            lucide.createIcons();
+                        }).catch(() => {});
+                    }
+                }).catch((err) => {
+                    if (activeId !== v.id) return;
+                    videoSpinner.classList.add('hidden');
+                    showToast(gateErrorMessage(err), "system");
+                });
+            };
+            if (!downloadCfgSettled) {
+                deferred(async () => {
+                    await (downloadCfgReady || refreshDownloadCfg(false));
+                    return gateOn() ? await resolvePlayUrl(v) : v.url;
+                });
+                return;
+            }
+            if (!gateOn()) { currentPlayUrl = v.url; playerSrc.src = v.url; player.load(); return; }
+            const hit = signedMedia.get(v.url);
+            if (hit && hit.exp - Date.now() > 10 * 60000) { apply(hit.url); return; }
+            deferred(() => resolvePlayUrl(v));
+        }
+
+        // ================= 端末をまたぐ同期(履歴・再開位置・設定) =================
+        const SYNC_BASE = SAVES_BASE.replace('/userSaves', '/userSync');
+        let syncPulled = false;
+        let syncPushing = false;
+        let syncInFlight = false;
+        let syncTimer = null;
+        let syncDebounce = null;
+
+        function syncDocId() {
+            const k = currentAccountKey();
+            return k ? (window.APP_UNIQUE_ID + '__' + k) : '';
+        }
+
+        function collectSyncPayload() {
+            return { h: userWatchHistory, r: userResumeTimes, c: appConfig, n: notificationSettings };
+        }
+
+        function syncHashOf(p) {
+            return gvnHash(new TextEncoder().encode(JSON.stringify(p)));
+        }
+
+        function syncStateKey() { return 'sync_state_' + currentUser; }
+
+        // localDirty=true(この端末に未同期の変更がある)なら和集合、falseならクラウドの内容をそのまま採用
+        function mergeSync(local, remote, localDirty) {
+            if (!localDirty) {
+                return { h: remote.h || [], r: remote.r || {}, c: remote.c || local.c, n: remote.n || local.n };
+            }
+            const h = [];
+            const seen = new Set();
+            (local.h || []).concat(remote.h || []).forEach(x => {
+                const id = x && x.id;
+                if (id !== undefined && !seen.has(id)) { seen.add(id); h.push(x); }
+            });
+            return {
+                h: h.slice(0, 200),
+                r: Object.assign({}, remote.r || {}, local.r || {}),
+                c: Object.assign({}, remote.c || {}, local.c || {}),
+                n: Object.assign({}, remote.n || {}, local.n || {})
+            };
+        }
+
+        async function fetchSyncDoc() {
+            const id = syncDocId();
+            if (!id) return null;
+            const res = await savesFetch(SYNC_BASE + '/' + encodeURIComponent(id) + '?key=' + SAVES_API_KEY);
+            if (res.status === 404) return null;
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const json = await res.json();
+            const str = json.fields && json.fields.data && json.fields.data.stringValue;
+            if (!str) return null;
+            return { payload: JSON.parse(str) };
+        }
+
+        async function pushSync(payload, keepalive) {
+            const id = syncDocId();
+            if (!id) throw new Error('アカウント未確認');
+            const body = { fields: {
+                data: { stringValue: JSON.stringify(payload) },
+                updatedAt: { timestampValue: new Date().toISOString() }
+            } };
+            const res = await savesFetch(
+                SYNC_BASE + '/' + encodeURIComponent(id) + '?updateMask.fieldPaths=data&updateMask.fieldPaths=updatedAt&key=' + SAVES_API_KEY,
+                { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), keepalive: !!keepalive }
+            );
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+        }
+
+        function applySyncPayload(p) {
+            if (Array.isArray(p.h)) userWatchHistory = p.h;
+            if (p.r && typeof p.r === 'object') userResumeTimes = p.r;
+            if (p.c && typeof p.c === 'object') Object.assign(appConfig, p.c);
+            if (p.n && typeof p.n === 'object') Object.assign(notificationSettings, p.n);
+            setStoredData('history_' + currentUser, userWatchHistory);
+            setStoredData('resumes_' + currentUser, userResumeTimes);
+            setStoredData('app_config', appConfig);
+            setStoredData('notifications_config', notificationSettings);
+        }
+
+        async function syncUserDataFromCloud() {
+            if (!currentUser || syncInFlight) return;
+            if (!syncDocId()) return;
+            const user = currentUser;
+            syncInFlight = true;
+            try {
+                const remote = await fetchSyncDoc();
+                if (currentUser !== user) return;
+                const local = collectSyncPayload();
+                const state = getStoredData(syncStateKey(), null);
+                if (!remote) {
+                    await pushSync(local, false);
+                    setStoredData(syncStateKey(), { hash: syncHashOf(local), t: Date.now() });
+                } else {
+                    const localDirty = !state || state.hash !== syncHashOf(local);
+                    const merged = mergeSync(local, remote.payload, localDirty);
+                    applySyncPayload(merged);
+                    try { applyStartupConfig(); populateSettingsInputs(); } catch (e) {}
+                    renderPlaylist();
+                    const after = collectSyncPayload();
+                    if (JSON.stringify(after) !== JSON.stringify(remote.payload)) await pushSync(after, false);
+                    setStoredData(syncStateKey(), { hash: syncHashOf(after), t: Date.now() });
+                }
+                syncPulled = true;
+                startSyncTimer();
+            } catch (e) {
+                // 同期できなくても、この端末では今まで通り使える(次回ログイン時に再試行)
+            } finally {
+                syncInFlight = false;
+            }
+        }
+
+        async function pushSyncNow(keepalive) {
+            if (!currentUser || !syncPulled || syncPushing) return;
+            const payload = collectSyncPayload();
+            const hash = syncHashOf(payload);
+            const state = getStoredData(syncStateKey(), null);
+            if (state && state.hash === hash) return;
+            syncPushing = true;
+            try {
+                await pushSync(payload, keepalive);
+                setStoredData(syncStateKey(), { hash: hash, t: Date.now() });
+            } catch (e) {} finally { syncPushing = false; }
+        }
+
+        function startSyncTimer() {
+            if (syncTimer) return;
+            syncTimer = setInterval(() => pushSyncNow(false), 30000);
+            document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') pushSyncNow(true); });
+            window.addEventListener('pagehide', () => pushSyncNow(true));
+        }
+
+        async function saveUserDataToCloud() {
+            if (!currentUser) return;
+            setStoredData('history_' + currentUser, userWatchHistory);
+            setStoredData('favorites_' + currentUser, userFavorites);
+            setStoredData('resumes_' + currentUser, userResumeTimes);
+            clearTimeout(syncDebounce);
+            syncDebounce = setTimeout(() => pushSyncNow(false), 8000);
+        }
+
+        // ================= タグでの絞り込み・検索履歴 =================
+        let tagFilter = '';
+
+        function updateTagChips() {
+            const box = document.getElementById('tagChips');
+            if (!box) return;
+            const counts = {};
+            videos.forEach(v => tagsOf(v).forEach(t => { counts[t] = (counts[t] || 0) + 1; }));
+            const tags = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b)).slice(0, 24);
+            const sig = tags.map(t => t + ':' + counts[t]).join(',') + '|' + tagFilter;
+            if (box.dataset.sig === sig) return;
+            box.dataset.sig = sig;
+            box.innerHTML = '';
+            if (tags.length === 0) { box.classList.add('hidden'); return; }
+            box.classList.remove('hidden');
+            tags.forEach(t => {
+                const on = tagFilter === t;
+                const b = document.createElement('button');
+                b.className = 'flex-shrink-0 px-3 py-1.5 rounded-full border text-[11px] font-bold transition-all active:scale-95 ' +
+                    (on ? 'border-brandAccent bg-brandAccent text-white' : 'border-brandBorder bg-brandSurface text-brandMuted');
+                b.textContent = '#' + t + ' ' + counts[t];
+                b.onclick = () => setTagFilter(on ? '' : t);
+                box.appendChild(b);
+            });
+        }
+
+        function setTagFilter(t) {
+            tagFilter = t || '';
+            renderPlaylist();
+        }
+
+        function getSearchHistory() {
+            const h = getStoredData('search_history', []);
+            return Array.isArray(h) ? h : [];
+        }
+
+        function pushSearchHistory(q) {
+            const text = String(q || '').trim();
+            if (!text) return;
+            const h = getSearchHistory().filter(x => x !== text);
+            h.unshift(text);
+            setStoredData('search_history', h.slice(0, 8));
+        }
+
+        function renderSearchHistory() {
+            const box = document.getElementById('searchHistoryBox');
+            const input = document.getElementById('searchInput');
+            if (!box || !input) return;
+            const h = getSearchHistory();
+            if (input.value.trim() !== '' || h.length === 0) { box.classList.add('hidden'); return; }
+            box.innerHTML = '';
+            h.forEach(q => {
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between px-3 py-2.5 text-xs text-brandText hover:bg-brandBg cursor-pointer';
+                const label = document.createElement('span');
+                label.className = 'truncate flex-1';
+                label.textContent = q;
+                row.onpointerdown = (e) => {
+                    e.preventDefault();
+                    input.value = q;
+                    handleSearch();
+                    box.classList.add('hidden');
+                };
+                const del = document.createElement('button');
+                del.className = 'p-1 text-brandMuted hover:text-red-500 flex-shrink-0';
+                del.textContent = '×';
+                del.onpointerdown = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setStoredData('search_history', getSearchHistory().filter(x => x !== q));
+                    renderSearchHistory();
+                };
+                row.appendChild(label);
+                row.appendChild(del);
+                box.appendChild(row);
+            });
+            const clear = document.createElement('div');
+            clear.className = 'px-3 py-2 text-[10px] text-brandMuted text-center border-t border-brandBorder cursor-pointer hover:text-brandText';
+            clear.textContent = '履歴をすべて消す';
+            clear.onpointerdown = (e) => {
+                e.preventDefault();
+                setStoredData('search_history', []);
+                box.classList.add('hidden');
+            };
+            box.appendChild(clear);
+            box.classList.remove('hidden');
+        }
+
+        // ================= AirPlay・長押し倍速 =================
+        function showAirPlayPicker() {
+            try { player.webkitShowPlaybackTargetPicker(); } catch (e) {}
+        }
+
+        function setupLongPressSpeed() {
+            const overlay = document.getElementById('touchGestureOverlay');
+            const badge = document.getElementById('speedIndicator');
+            if (!overlay || !player) return;
+            let timer = null;
+            let active = false;
+            let sx = 0, sy = 0, endAt = 0, prevRate = 1;
+            const end = () => {
+                clearTimeout(timer);
+                timer = null;
+                if (active) {
+                    active = false;
+                    player.playbackRate = prevRate;
+                    endAt = Date.now();
+                    if (badge) badge.classList.add('hidden');
+                }
+            };
+            overlay.addEventListener('touchstart', (e) => {
+                if (e.touches.length !== 1) return;
+                sx = e.touches[0].clientX;
+                sy = e.touches[0].clientY;
+                clearTimeout(timer);
+                timer = setTimeout(() => {
+                    if (player.paused || player.ended) return;
+                    active = true;
+                    prevRate = player.playbackRate;
+                    player.playbackRate = 2;
+                    if (badge) badge.classList.remove('hidden');
+                    try { if (navigator.vibrate) navigator.vibrate(15); } catch (err) {}
+                }, 450);
+            }, { passive: true });
+            overlay.addEventListener('touchmove', (e) => {
+                const t = e.touches[0];
+                if (!active && t && (Math.abs(t.clientX - sx) > 10 || Math.abs(t.clientY - sy) > 10)) clearTimeout(timer);
+            }, { passive: true });
+            overlay.addEventListener('touchend', end);
+            overlay.addEventListener('touchcancel', end);
+            // 長押しを離した直後のタップ(再生/停止の切り替え)を無効にする
+            overlay.addEventListener('click', (e) => {
+                if (Date.now() - endAt < 500) { e.stopPropagation(); e.preventDefault(); }
+            }, true);
+        }
+
+        function setupExtraControls() {
+            try {
+                if (player) {
+                    player.setAttribute('x-webkit-airplay', 'allow');
+                    if (typeof player.webkitShowPlaybackTargetPicker === 'function') {
+                        const b = document.getElementById('airplayBtn');
+                        if (b) b.classList.remove('hidden');
+                    }
+                }
+            } catch (e) {}
+            setupLongPressSpeed();
+            const si = document.getElementById('searchInput');
+            const box = document.getElementById('searchHistoryBox');
+            if (si && box) {
+                si.addEventListener('focus', renderSearchHistory);
+                si.addEventListener('input', renderSearchHistory);
+                si.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.isComposing) { pushSearchHistory(si.value); box.classList.add('hidden'); }
+                });
+                si.addEventListener('blur', () => {
+                    pushSearchHistory(si.value);
+                    setTimeout(() => box.classList.add('hidden'), 200);
+                });
+            }
+        }
+
         function playRandom() {
             const pool = videos.filter(v => {
                 if (v.id === activeId) return false;
                 if (monthFilter && monthKeyOf(v) !== monthFilter) return false;
+                if (tagFilter && !tagsOf(v).includes(tagFilter)) return false;
                 if (!searchQuery) return true;
                 return (v.title || '').toLowerCase().includes(searchQuery)
                     || (v.desc || '').toLowerCase().includes(searchQuery)
@@ -3167,6 +3541,7 @@ window.__firebase_config = JSON.stringify({
                 if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); postComment(); }
             });
 
+            setupExtraControls();
             lucide.createIcons();
         }
 
@@ -3332,20 +3707,15 @@ window.__firebase_config = JSON.stringify({
             if (videosSubscribed) return;
             videosSubscribed = true;
 
-            const { query, orderBy, onSnapshot, getDocs, addDoc, serverTimestamp } = window.firestoreFns;
+            const { query, orderBy, onSnapshot, getDocs } = window.firestoreFns;
             const videosRef = getVideosCollectionRef();
             const q = query(videosRef, orderBy('id', 'asc'));
 
             try {
-                const snapshot = await Promise.race([
+                await Promise.race([
                     getDocs(q),
                     new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000))
                 ]);
-                if (snapshot.empty && typeof videosData !== 'undefined' && Array.isArray(videosData) && videosData.length > 0) {
-                    for (const v of videosData) {
-                        await addDoc(videosRef, { ...v, createdAt: serverTimestamp() });
-                    }
-                }
             } catch (err) {
                 console.error('Firestore初期取得エラー:', err);
                 fallbackLoadVideos();
@@ -3365,77 +3735,7 @@ window.__firebase_config = JSON.stringify({
             });
         }
 
-        function isAdmin() {
-            return typeof ADMIN_DISCORD_IDS !== 'undefined' && Array.isArray(ADMIN_DISCORD_IDS) && !!currentUserDiscordId && ADMIN_DISCORD_IDS.includes(currentUserDiscordId);
-        }
-
         const ADMIN_URL_HASH = '#qz8f2mx91kd';
-
-        function updateAddVideoButtonVisibility() {
-            const btn = document.getElementById('addVideoBtn');
-            if (!btn) return;
-            const hashMatches = window.location.hash === ADMIN_URL_HASH;
-            btn.classList.toggle('hidden', !(isAdmin() && hashMatches));
-        }
-
-        function openAddVideoModal() {
-            if (!isAdmin()) return;
-            document.getElementById('addVideoForm').reset();
-            toggleAddVideoFields();
-            document.getElementById('addVideoModal').classList.remove('hidden');
-        }
-
-        function closeAddVideoModal() {
-            document.getElementById('addVideoModal').classList.add('hidden');
-        }
-
-        function toggleAddVideoFields() {
-            const isImage = document.getElementById('addVideoType').value === 'image';
-            document.getElementById('addVideoUrlField').classList.toggle('hidden', isImage);
-            document.getElementById('addVideoImagesField').classList.toggle('hidden', !isImage);
-        }
-
-        async function submitAddVideo(event) {
-            event.preventDefault();
-            if (!isAdmin()) return;
-
-            const videosRef = getVideosCollectionRef();
-            if (!videosRef || !window.firestoreFns) {
-                showToast('データベースに接続できていません', 'system');
-                return;
-            }
-
-            const type = document.getElementById('addVideoType').value;
-            const nextId = videos.length > 0 ? Math.max(...videos.map(v => v.id || 0)) + 1 : 1;
-
-            const newVideo = {
-                id: nextId,
-                type,
-                title: document.getElementById('addVideoTitle').value.trim(),
-                thumbnail: document.getElementById('addVideoThumbnail').value.trim(),
-                duration: document.getElementById('addVideoDuration').value.trim(),
-                date: document.getElementById('addVideoDate').value.trim(),
-                desc: document.getElementById('addVideoDesc').value.trim()
-            };
-
-            if (type === 'image') {
-                newVideo.images = document.getElementById('addVideoImages').value
-                    .split('\n')
-                    .map(s => s.trim())
-                    .filter(s => s.length > 0);
-            } else {
-                newVideo.url = document.getElementById('addVideoUrl').value.trim();
-            }
-
-            try {
-                await window.firestoreFns.addDoc(videosRef, { ...newVideo, createdAt: window.firestoreFns.serverTimestamp() });
-                closeAddVideoModal();
-                showToast('追加しました', 'system');
-            } catch (err) {
-                console.error('動画追加エラー:', err);
-                showToast('追加に失敗しました', 'system');
-            }
-        }
 
         let activeId = 1;
         let hasLoadedInitialMedia = false;
@@ -3561,6 +3861,7 @@ window.__firebase_config = JSON.stringify({
 
                 const memberData = await guildMemberRes.json();
                 const hasRole = memberData.roles && memberData.roles.some(role => String(role) === String(DISCORD_CONFIG["role-id"]));
+                        try { setStoredData('session_discord_roles', (memberData.roles || []).map(String)); } catch (e) {}
 
                 if (!hasRole) {
                     showRoleLostOverlay();
@@ -3643,7 +3944,7 @@ window.__firebase_config = JSON.stringify({
                 imageViewer.classList.remove('hidden');
                 imageViewer.classList.add('flex');
                 
-                setupImageViewer(v.images);
+                loadGatedImages(v);
             } else {
                 imageViewer.classList.add('hidden');
                 imageViewer.classList.remove('flex');
@@ -3652,9 +3953,9 @@ window.__firebase_config = JSON.stringify({
                 controls.classList.remove('hidden');
                 touchOverlay.classList.remove('hidden');
 
-                playerSrc.src = v.url;
-                player.poster = v.thumbnail;
-                player.load();
+                currentPlayUrl = v.url;
+                player.poster = mediaUrl(v.thumbnail);
+                attachVideoSource(v, appConfig.autoPlay);
                 
                 player.playbackRate = appConfig.playbackRate;
                 player.loop = appConfig.loop;
@@ -3710,7 +4011,7 @@ window.__firebase_config = JSON.stringify({
             
             images.forEach((src, idx) => {
                 const img = document.createElement('img');
-                img.src = src;
+                img.src = mediaUrl(src);
                 img.className = 'w-full h-full object-contain flex-shrink-0 select-none';
                 img.ondragstart = () => false;
                 track.appendChild(img);
@@ -4094,6 +4395,11 @@ window.__firebase_config = JSON.stringify({
                     const me = await getDiscordIdentity();
                     const list = Array.isArray(cfg.discord) ? cfg.discord : [];
                     allowed = !!me.id && !!me.username && list.some(d => d && String(d.id) === me.id && String(d.username) === me.username);
+                    if (!allowed) {
+                        const roleIds = (Array.isArray(cfg.roleIds) ? cfg.roleIds : []).map(r => (r && typeof r === 'object') ? String(r.id) : String(r));
+                        const myRoles = getStoredData('session_discord_roles', []);
+                        allowed = Array.isArray(myRoles) && myRoles.some(r => roleIds.includes(String(r)));
+                    }
                 } else {
                     const list = Array.isArray(cfg.accounts) ? cfg.accounts : [];
                     allowed = !!currentUser && list.some(n => String(n) === String(currentUser));
@@ -4113,13 +4419,28 @@ window.__firebase_config = JSON.stringify({
             const gateLabel = gateTxt ? gateTxt.textContent : '';
             if (gateBtn) gateBtn.disabled = true;
             if (gateTxt) gateTxt.textContent = '確認中...';
-            const permitted = await checkDownloadPermission();
+            await refreshDownloadCfg(false);
+            let signedDl = null;
+            let permitted;
+            if (gateOn()) {
+                // 動画URLの保護がオン: 認証サーバーが本人確認と権限を判定して、5分だけ有効なURLを返す
+                try {
+                    const target = (v.type === 'image' || v.images) ? currentImages[currentImageIndex] : v.url;
+                    signedDl = (await signMediaUrls([target], 'download')).urls[0];
+                    permitted = true;
+                } catch (err) {
+                    showToast(gateErrorMessage(err), "system");
+                    permitted = false;
+                }
+            } else {
+                permitted = await checkDownloadPermission();
+            }
             if (gateBtn) gateBtn.disabled = false;
             if (gateTxt) gateTxt.textContent = gateLabel || 'ダウンロード';
             if (!permitted) return;
 
             if (v.type === 'image' || v.images) {
-                const imgUrl = currentImages[currentImageIndex];
+                const imgUrl = signedDl || currentImages[currentImageIndex];
                 try {
                     const res = await fetch(imgUrl);
                     const blob = await res.blob();
@@ -4138,7 +4459,7 @@ window.__firebase_config = JSON.stringify({
                 const txt = document.getElementById("downloadBtnText");
                 btn.disabled = true; txt.textContent = "準備中...";
                 try {
-                    const res = await fetch(v.url);
+                    const res = await fetch(signedDl || v.url);
                     if (!res.ok) throw new Error('HTTP ' + res.status);
                     const len = +res.headers.get('Content-Length');
                     const reader = res.body.getReader();
@@ -4160,7 +4481,7 @@ window.__firebase_config = JSON.stringify({
                     if (e && /^HTTP/.test(e.message || '')) reason = '配信元がエラーを返しました (' + e.message + ')';
                     else if (e && e.name === 'TypeError') reason = 'ブラウザが動画の取得をブロックしました(配信元がCORSを許可していない、または通信エラー)';
                     else reason = (e && e.message) ? e.message : '不明なエラー';
-                    openDownloadModal(v.url, reason);
+                    openDownloadModal(signedDl || v.url, reason);
                 } finally {
                     btn.disabled = false; txt.textContent = "ダウンロード";
                 }
@@ -4261,10 +4582,13 @@ window.__firebase_config = JSON.stringify({
         function renderPlaylist() {
             playlistContainer.innerHTML = "";
             updateMonthOptions();
+            updateTagChips();
+            maybeSignThumbnails();
             renderRelated();
 
             let filtered = videos.filter(v => {
                 if (monthFilter && monthKeyOf(v) !== monthFilter) return false;
+                if (tagFilter && !tagsOf(v).includes(tagFilter)) return false;
                 if (!searchQuery) return true;
                 const titleMatch = v.title.toLowerCase().includes(searchQuery);
                 const descMatch = v.desc.toLowerCase().includes(searchQuery);
@@ -4277,6 +4601,8 @@ window.__firebase_config = JSON.stringify({
             } else {
                 filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
             }
+            // ピン留めされた動画を先頭に(並び順は保つ)
+            filtered = filtered.filter(v => v.pinned).concat(filtered.filter(v => !v.pinned));
 
             if (filtered.length === 0) {
                 playlistContainer.innerHTML = `
@@ -4300,7 +4626,7 @@ window.__firebase_config = JSON.stringify({
                 card.className = `group flex gap-3 p-3 rounded-2xl cursor-pointer transition-all border border-transparent ${ isActive ? "bg-brandBg border-brandBorder shadow-inner" : "bg-brandSurface/50 hover:bg-brandSurface hover:border-brandBorder" }`;
                 card.innerHTML = `
                     <div class="relative w-28 lg:w-32 h-16 bg-black rounded-xl overflow-hidden flex-shrink-0 border border-brandBorder">
-                        <img class="absolute inset-0 w-full h-full object-contain transition-transform group-hover:scale-105" src="${v.thumbnail}">
+                        <img class="absolute inset-0 w-full h-full object-contain transition-transform group-hover:scale-105" src="${mediaUrl(v.thumbnail)}">
                         ${userFavorites.includes(v.id) ? '<i data-lucide="heart" class="absolute top-1 left-1 w-3.5 h-3.5 text-rose-400 fill-rose-400 z-10"></i>' : ''}
                         ${userSaved.includes(v.id) ? '<i data-lucide="bookmark" class="absolute top-1 right-1 w-3.5 h-3.5 text-amber-400 fill-amber-400 z-10"></i>' : ''}
                         ${isNewV ? '<span class="absolute bottom-1 left-1 bg-brandAccent text-white text-[8px] font-black px-1 rounded z-10">NEW</span>' : ''}
@@ -4311,7 +4637,7 @@ window.__firebase_config = JSON.stringify({
                         ${isActive ? '<div class="absolute inset-0 bg-brandAccent/20 flex items-center justify-center z-20"><i data-lucide="play" class="w-5 h-5 text-brandAccent fill-current"></i></div>' : ''}
                     </div>
                     <div class="flex flex-col justify-between py-0.5 min-w-0">
-                        <h3 class="text-xs font-bold text-brandText line-clamp-2 group-hover:text-brandAccent transition-colors">${v.title}</h3>
+                        <h3 class="text-xs font-bold text-brandText line-clamp-2 group-hover:text-brandAccent transition-colors">${v.pinned ? '📌 ' : ''}${v.title}</h3>
                         <p class="text-[10px] text-brandMuted">${v.date}</p>
                     </div>`;
                 playlistContainer.appendChild(card);
