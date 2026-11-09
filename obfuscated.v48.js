@@ -159,14 +159,17 @@ const APP_LAYOUT_HTML = String.raw`
                             </div>
 
                             <div class="flex items-center gap-1.5 sm:gap-4">
-                                <button id="airplayBtn" onclick="showAirPlayPicker()" class="hidden p-2 text-white hover:text-brandAccent transition-colors flex items-center justify-center min-w-[40px] min-h-[40px] active:scale-90" title="AirPlay">
+                                <button id="lockBtn" onclick="toggleControlsLock()" class="p-2 text-white hover:text-brandAccent transition-colors flex items-center justify-center min-w-[40px] min-h-[40px] active:scale-90" title="操作ロック">
+                            <i data-lucide="lock-open" class="w-5 h-5"></i>
+                        </button>
+                        <button id="airplayBtn" onclick="showAirPlayPicker()" class="hidden p-2 text-white hover:text-brandAccent transition-colors flex items-center justify-center min-w-[40px] min-h-[40px] active:scale-90" title="AirPlay">
                             <i data-lucide="airplay" class="w-5 h-5"></i>
                         </button>
-                        <button id="toolsBtn" onclick="toggleToolsMenu(event)" class="p-2 text-white hover:text-brandAccent transition-colors flex items-center justify-center min-w-[40px] min-h-[40px] active:scale-90" title="ツール">
+                        <button id="toolsBtn" onclick="toggleToolsMenu(event)" class="p-2 text-white hover:text-brandAccent transition-colors hidden lg:flex items-center justify-center min-w-[40px] min-h-[40px] active:scale-90" title="ツール">
                             <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
                         </button>
-                        <button id="theaterBtn" onclick="toggleTheaterMode()" class="p-2 text-white hover:text-brandAccent transition-colors hidden sm:flex items-center justify-center min-w-[40px] min-h-[40px]" title="大画面モード切替 (T)">
-                                    <i data-lucide="rectangle-horizontal" class="w-5 h-5"></i>
+                        <button id="theaterBtn" onclick="toggleTheaterMode()" class="p-2 text-white hover:text-brandAccent transition-colors hidden sm:flex items-center justify-center min-w-[40px] min-h-[40px]" title="大画面にする (T)">
+                                    <i data-lucide="expand" class="w-5 h-5"></i>
                                 </button>
                                 <button id="pipBtn" onclick="togglePiP()" class="p-2 text-white hover:text-brandAccent transition-colors hidden sm:flex items-center justify-center min-w-[40px] min-h-[40px]" title="ピクチャーインピクチャー">
                                     <i data-lucide="picture-in-picture-2" class="w-5 h-5"></i>
@@ -177,6 +180,9 @@ const APP_LAYOUT_HTML = String.raw`
                             </div>
                         </div>
                     </div>
+                    <button id="unlockPill" onclick="unlockControls()" class="absolute top-3 left-1/2 px-6 py-2 rounded-full bg-black/80 border border-white/30 text-white text-xs font-black tracking-wider z-50 flex items-center gap-2 shadow-xl" style="transform: translate(-50%, -160%); opacity: 0; pointer-events: none; transition: transform .35s cubic-bezier(.2,.9,.3,1.2), opacity .25s;">
+                        <i data-lucide="lock-open" class="w-3.5 h-3.5"></i><span>解除</span>
+                    </button>
                     <div id="speedIndicator" class="hidden absolute top-4 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs font-black px-3 py-1.5 rounded-full z-40 pointer-events-none">2倍速 ▶▶</div>
                     <div id="toolsMenu" class="hidden absolute right-2 bottom-24 sm:bottom-28 w-64 max-w-[calc(100%-1rem)] max-h-[70%] overflow-y-auto bg-black/90 border border-white/15 rounded-2xl p-4 z-50 space-y-4 text-white shadow-2xl" onclick="event.stopPropagation()">
                         <div>
@@ -865,7 +871,7 @@ const APP_LAYOUT_HTML = String.raw`
         };
         add({ rel: 'apple-touch-icon', href: base + 'apple-touch-icon_a0d5f87d.png' });
         add({ rel: 'icon', href: base + 'favicon_6f31e306.ico', sizes: 'any' });
-        add({ rel: 'icon', type: 'image/png', sizes: '192x192', href: base + 'icon-192_1a004a02.png' });
+        add({ rel: 'icon', type: 'image/png', sizes: '192x192', href: base + 'icon-192_64a98007.png' });
     } catch (e) {}
 })();
 
@@ -1747,6 +1753,7 @@ window.__firebase_config = JSON.stringify({
             setupKeyboardShortcuts();
             setupDoubleTapGestures();
             setupAutoFadeControls();
+            setupTapToggleControls();
             setupImageSwipeEvents();
         }
 
@@ -3386,11 +3393,12 @@ window.__firebase_config = JSON.stringify({
                     active = false;
                     player.playbackRate = prevRate;
                     endAt = Date.now();
+                    longPressEndAt = endAt;
                     if (badge) badge.classList.add('hidden');
                 }
             };
             overlay.addEventListener('touchstart', (e) => {
-                if (e.touches.length !== 1) return;
+                if (e.touches.length !== 1 || controlsLocked) return;
                 sx = e.touches[0].clientX;
                 sy = e.touches[0].clientY;
                 clearTimeout(timer);
@@ -4277,7 +4285,8 @@ window.__firebase_config = JSON.stringify({
                 playerCol.classList.remove("lg:col-span-2");
                 playerCol.classList.add("lg:col-span-3");
                 
-                theaterBtn.innerHTML = `<i data-lucide="rectangle-vertical" class="w-5 h-5 text-brandAccent"></i>`;
+                theaterBtn.innerHTML = `<i data-lucide="shrink" class="w-5 h-5 text-brandAccent"></i>`;
+                theaterBtn.title = "大画面を解除 (T)";
                 if (!silent) showToast("大画面モード: ON", 'theaterMode');
             } else {
                 grid.classList.remove("max-w-7xl");
@@ -4285,7 +4294,8 @@ window.__firebase_config = JSON.stringify({
                 playerCol.classList.remove("lg:col-span-3");
                 playerCol.classList.add("lg:col-span-2");
                 
-                theaterBtn.innerHTML = `<i data-lucide="rectangle-horizontal" class="w-5 h-5"></i>`;
+                theaterBtn.innerHTML = `<i data-lucide="expand" class="w-5 h-5"></i>`;
+                theaterBtn.title = "大画面にする (T)";
                 if (!silent) showToast("大画面モード: OFF", 'theaterMode');
             }
             lucide.createIcons();
@@ -4753,6 +4763,7 @@ window.__firebase_config = JSON.stringify({
 
             if (leftZone) {
                 leftZone.addEventListener("click", () => {
+                    if (controlsLocked) return;
                     const now = Date.now();
                     if (now - lastTapLeft < 300) {
                         skipTime(-appConfig.doubleTapSeek);
@@ -4764,6 +4775,7 @@ window.__firebase_config = JSON.stringify({
 
             if (rightZone) {
                 rightZone.addEventListener("click", () => {
+                    if (controlsLocked) return;
                     const now = Date.now();
                     if (now - lastTapRight < 300) {
                         skipTime(appConfig.doubleTapSeek);
@@ -4789,25 +4801,123 @@ window.__firebase_config = JSON.stringify({
             const controls = document.getElementById("playerControls");
 
             function showControls() {
-                controls.style.opacity = "1";
-                controls.style.pointerEvents = "auto";
+                if (controlsLocked) return;
+                setControlsVisible(true);
                 clearTimeout(controlsTimeout);
                 if (!player.paused) {
-                    controlsTimeout = setTimeout(() => {
-                        controls.style.opacity = "0";
-                        controls.style.pointerEvents = "none";
-                    }, 3000);
+                    controlsTimeout = setTimeout(() => setControlsVisible(false), 3000);
                 }
             }
 
+            // マウスを動かしたら表示(パソコン用)。タッチは、タップで表示/非表示を切り替える(setupTapToggleControls)
             container.addEventListener("mousemove", showControls);
-            container.addEventListener("touchstart", showControls, {passive: true});
+            container.addEventListener("dblclick", () => { if (controlsLocked) showUnlockPill(); });
+        }
+
+        // ================= 操作バーの表示切り替え・ロック =================
+        let controlsLocked = false;
+        let controlsShown = true;
+        let unlockPillTimer = null;
+        let longPressEndAt = 0;
+
+        function setControlsVisible(visible) {
+            const controls = document.getElementById("playerControls");
+            if (!controls) return;
+            controlsShown = visible;
+            controls.style.opacity = visible ? "1" : "0";
+            controls.style.pointerEvents = visible ? "auto" : "none";
+            if (!visible) {
+                const menu = document.getElementById('toolsMenu');
+                if (menu) menu.classList.add('hidden');
+            }
+        }
+
+        function updateLockBtnUI() {
+            const btn = document.getElementById('lockBtn');
+            if (!btn) return;
+            btn.innerHTML = `<i data-lucide="${controlsLocked ? 'lock' : 'lock-open'}" class="w-5 h-5 ${controlsLocked ? 'text-brandAccent' : ''}"></i>`;
+            lucide.createIcons();
+        }
+
+        function toggleControlsLock() {
+            if (controlsLocked) { unlockControls(); return; }
+            controlsLocked = true;
+            clearTimeout(controlsTimeout);
+            setControlsVisible(false);
+            updateLockBtnUI();
+            showToast("操作をロックしました(ダブルタップで「解除」が出ます)", "system");
+        }
+
+        function unlockControls() {
+            controlsLocked = false;
+            hideUnlockPill();
+            updateLockBtnUI();
+            resetControlsTimeout();
+        }
+
+        // 上から「解除」ボタンがスッと降りてくる
+        function showUnlockPill() {
+            const pill = document.getElementById('unlockPill');
+            if (!pill) return;
+            pill.style.transform = 'translate(-50%, 0)';
+            pill.style.opacity = '1';
+            pill.style.pointerEvents = 'auto';
+            clearTimeout(unlockPillTimer);
+            unlockPillTimer = setTimeout(hideUnlockPill, 3500);
+        }
+
+        function hideUnlockPill() {
+            const pill = document.getElementById('unlockPill');
+            if (!pill) return;
+            clearTimeout(unlockPillTimer);
+            pill.style.transform = 'translate(-50%, -160%)';
+            pill.style.opacity = '0';
+            pill.style.pointerEvents = 'none';
+        }
+
+        // 操作部分以外を1回タップ → 操作バーを全部隠す(もう1回で表示)。ダブルタップは10秒スキップ用に空ける。
+        function setupTapToggleControls() {
+            const overlay = document.getElementById('touchGestureOverlay');
+            if (!overlay) return;
+            let sx = 0, sy = 0, moved = false, lastTapAt = 0, tapTimer = null;
+            overlay.addEventListener('touchstart', (e) => {
+                if (e.touches.length !== 1) { moved = true; return; }
+                sx = e.touches[0].clientX;
+                sy = e.touches[0].clientY;
+                moved = false;
+            }, { passive: true });
+            overlay.addEventListener('touchmove', (e) => {
+                const t = e.touches[0];
+                if (t && (Math.abs(t.clientX - sx) > 10 || Math.abs(t.clientY - sy) > 10)) moved = true;
+            }, { passive: true });
+            overlay.addEventListener('touchend', (e) => {
+                if (moved || e.changedTouches.length !== 1) return;
+                if (Date.now() - longPressEndAt < 500) return;
+                const now = Date.now();
+                if (now - lastTapAt < 300) {
+                    // ダブルタップ: ロック中なら「解除」ボタンを出す(ロックしていなければ、10秒スキップが動く)
+                    clearTimeout(tapTimer);
+                    tapTimer = null;
+                    lastTapAt = 0;
+                    if (controlsLocked) showUnlockPill();
+                    return;
+                }
+                lastTapAt = now;
+                clearTimeout(tapTimer);
+                tapTimer = setTimeout(() => {
+                    tapTimer = null;
+                    if (controlsLocked) return;
+                    if (controlsShown) { clearTimeout(controlsTimeout); setControlsVisible(false); }
+                    else resetControlsTimeout();
+                }, 280);
+            });
         }
 
         function setupKeyboardShortcuts() {
             document.addEventListener("keydown", (e) => {
                 const tag = document.activeElement.tagName.toLowerCase();
                 if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+                if (controlsLocked) return;
 
                 if (e.code === 'Space' || e.code === 'KeyK') {
                     e.preventDefault();
@@ -4870,14 +4980,11 @@ window.__firebase_config = JSON.stringify({
         function resetControlsTimeout() {
             const controls = document.getElementById("playerControls");
             if (!controls) return;
-            controls.style.opacity = "1";
-            controls.style.pointerEvents = "auto";
+            if (controlsLocked) { setControlsVisible(false); return; }
+            setControlsVisible(true);
             clearTimeout(controlsTimeout);
             if (!player.paused && appConfig.controlsHideDelay > 0) {
-                controlsTimeout = setTimeout(() => {
-                    controls.style.opacity = "0";
-                    controls.style.pointerEvents = "none";
-                }, appConfig.controlsHideDelay * 1000);
+                controlsTimeout = setTimeout(() => setControlsVisible(false), appConfig.controlsHideDelay * 1000);
             }
         }
 
