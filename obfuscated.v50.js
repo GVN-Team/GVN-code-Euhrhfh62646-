@@ -159,17 +159,17 @@ const APP_LAYOUT_HTML = String.raw`
                             </div>
 
                             <div class="flex items-center gap-1.5 sm:gap-4">
-                                <button id="lockBtn" onclick="toggleControlsLock()" class="p-2 text-white hover:text-brandAccent transition-colors flex items-center justify-center min-w-[40px] min-h-[40px] active:scale-90" title="操作ロック">
+                                <button id="lockBtn" onclick="toggleControlsLock()" class="hidden p-2 text-white hover:text-brandAccent transition-colors flex items-center justify-center min-w-[40px] min-h-[40px] active:scale-90" title="操作ロック">
                             <i data-lucide="lock-open" class="w-5 h-5"></i>
                         </button>
                         <button id="airplayBtn" onclick="showAirPlayPicker()" class="hidden p-2 text-white hover:text-brandAccent transition-colors flex items-center justify-center min-w-[40px] min-h-[40px] active:scale-90" title="AirPlay">
                             <i data-lucide="airplay" class="w-5 h-5"></i>
                         </button>
-                        <button id="toolsBtn" onclick="toggleToolsMenu(event)" class="p-2 text-white hover:text-brandAccent transition-colors hidden lg:flex items-center justify-center min-w-[40px] min-h-[40px] active:scale-90" title="ツール">
+                        <button id="toolsBtn" onclick="toggleToolsMenu(event)" class="hidden p-2 text-white hover:text-brandAccent transition-colors flex items-center justify-center min-w-[40px] min-h-[40px] active:scale-90" title="ツール">
                             <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
                         </button>
-                        <button id="theaterBtn" onclick="toggleTheaterMode()" class="p-2 text-white hover:text-brandAccent transition-colors hidden sm:flex items-center justify-center min-w-[40px] min-h-[40px]" title="大画面にする (T)">
-                                    <i data-lucide="expand" class="w-5 h-5"></i>
+                        <button id="theaterBtn" onclick="toggleTheaterMode()" class="p-2 text-white hover:text-brandAccent transition-colors hidden sm:flex items-center justify-center min-w-[40px] min-h-[40px]" title="大画面モード切替 (T)">
+                                    <i data-lucide="rectangle-horizontal" class="w-5 h-5"></i>
                                 </button>
                                 <button id="pipBtn" onclick="togglePiP()" class="p-2 text-white hover:text-brandAccent transition-colors hidden sm:flex items-center justify-center min-w-[40px] min-h-[40px]" title="ピクチャーインピクチャー">
                                     <i data-lucide="picture-in-picture-2" class="w-5 h-5"></i>
@@ -487,6 +487,40 @@ const APP_LAYOUT_HTML = String.raw`
                             <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200"></div>
                         </div>
                     </label>
+                </div>
+            </div>
+
+            <h3 class="text-sm font-bold text-brandText mb-4 flex items-center gap-2 bg-brandBg py-2 px-3 rounded-lg border border-brandBorder">
+                <i data-lucide="wrench" class="w-4 h-4 text-brandAccent"></i> 再生ツール (Tools)
+            </h3>
+
+            <div class="space-y-4 mb-8 p-3 border border-brandBorder rounded bg-brandBg">
+                <div>
+                    <div class="flex items-center justify-between mb-2"><span class="text-xs font-bold text-brandText">スリープタイマー</span><span id="sleepStatusS" class="text-[10px] text-brandAccent font-mono"></span></div>
+                    <div id="sleepChipsS" class="flex flex-wrap gap-1.5">
+                        <button class="tool-chip" data-min="0" onclick="setSleepTimer(0)">オフ</button>
+                        <button class="tool-chip" data-min="15" onclick="setSleepTimer(15)">15分</button>
+                        <button class="tool-chip" data-min="30" onclick="setSleepTimer(30)">30分</button>
+                        <button class="tool-chip" data-min="60" onclick="setSleepTimer(60)">60分</button>
+                        <button class="tool-chip" data-min="-1" onclick="setSleepTimer(-1)">動画の終わり</button>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex items-center justify-between mb-2"><span class="text-xs font-bold text-brandText">A-Bリピート</span><span id="abStatusS" class="text-[10px] text-brandAccent font-mono"></span></div>
+                    <button id="abBtnS" class="tool-chip w-full" onclick="abStep()">A点を設定</button>
+                    <p class="text-[10px] text-brandMuted mt-1.5">現在の再生位置をA/Bに設定します。設定を閉じて動画を進めてからB点を設定してください。</p>
+                </div>
+                <div>
+                    <div class="flex items-center justify-between mb-2"><span class="text-xs font-bold text-brandText">音量ブースト</span><span id="boostStatusS" class="text-[10px] text-brandAccent font-mono"></span></div>
+                    <div id="boostChipsS" class="flex flex-wrap gap-1.5">
+                        <button class="tool-chip" data-level="1" onclick="setBoost(1)">オフ</button>
+                        <button class="tool-chip" data-level="1.5" onclick="setBoost(1.5)">150%</button>
+                        <button class="tool-chip" data-level="2" onclick="setBoost(2)">200%</button>
+                        <button class="tool-chip" data-level="3" onclick="setBoost(3)">300%</button>
+                    </div>
+                </div>
+                <div>
+                    <button class="tool-chip w-full flex items-center justify-center gap-1.5" onclick="takeScreenshot()"><i data-lucide="camera" class="w-3.5 h-3.5"></i>スクリーンショットを保存</button>
                 </div>
             </div>
 
@@ -2495,25 +2529,27 @@ window.__firebase_config = JSON.stringify({
         }
 
         function updateToolsUI() {
-            const sleepStatus = document.getElementById('sleepStatus');
-            if (sleepStatus) {
-                sleepStatus.textContent = sleepAtEnd ? '動画の終わりまで' : (sleepTimerEnd ? '残り ' + formatMmSs(sleepTimerEnd - Date.now()) : '');
-            }
-            document.querySelectorAll('#sleepChips .tool-chip').forEach(b => {
-                b.classList.toggle('active', parseInt(b.getAttribute('data-min'), 10) === sleepMinutes);
+            ['', 'S'].forEach(sfx => {
+                const sleepStatus = document.getElementById('sleepStatus' + sfx);
+                if (sleepStatus) {
+                    sleepStatus.textContent = sleepAtEnd ? '動画の終わりまで' : (sleepTimerEnd ? '残り ' + formatMmSs(sleepTimerEnd - Date.now()) : '');
+                }
+                document.querySelectorAll('#sleepChips' + sfx + ' .tool-chip').forEach(b => {
+                    b.classList.toggle('active', parseInt(b.getAttribute('data-min'), 10) === sleepMinutes);
+                });
+                const abBtn = document.getElementById('abBtn' + sfx);
+                const abStatus = document.getElementById('abStatus' + sfx);
+                if (abBtn && abStatus) {
+                    if (abA === null) { abBtn.textContent = 'A点を設定'; abStatus.textContent = ''; abBtn.classList.remove('active'); }
+                    else if (abB === null) { abBtn.textContent = 'B点を設定'; abStatus.textContent = 'A ' + formatTime(abA); abBtn.classList.remove('active'); }
+                    else { abBtn.textContent = '解除'; abStatus.textContent = formatTime(abA) + ' → ' + formatTime(abB); abBtn.classList.add('active'); }
+                }
+                document.querySelectorAll('#boostChips' + sfx + ' .tool-chip').forEach(b => {
+                    b.classList.toggle('active', parseFloat(b.getAttribute('data-level')) === boostLevel);
+                });
+                const boostStatus = document.getElementById('boostStatus' + sfx);
+                if (boostStatus) boostStatus.textContent = boostLevel > 1 ? Math.round(boostLevel * 100) + '%' : '';
             });
-            const abBtn = document.getElementById('abBtn');
-            const abStatus = document.getElementById('abStatus');
-            if (abBtn && abStatus) {
-                if (abA === null) { abBtn.textContent = 'A点を設定'; abStatus.textContent = ''; abBtn.classList.remove('active'); }
-                else if (abB === null) { abBtn.textContent = 'B点を設定'; abStatus.textContent = 'A ' + formatTime(abA); abBtn.classList.remove('active'); }
-                else { abBtn.textContent = '解除'; abStatus.textContent = formatTime(abA) + ' → ' + formatTime(abB); abBtn.classList.add('active'); }
-            }
-            document.querySelectorAll('#boostChips .tool-chip').forEach(b => {
-                b.classList.toggle('active', parseFloat(b.getAttribute('data-level')) === boostLevel);
-            });
-            const boostStatus = document.getElementById('boostStatus');
-            if (boostStatus) boostStatus.textContent = boostLevel > 1 ? Math.round(boostLevel * 100) + '%' : '';
             const toolsBtnEl = document.getElementById('toolsBtn');
             if (toolsBtnEl) {
                 const any = sleepMinutes !== 0 || abA !== null || boostLevel > 1;
@@ -2549,7 +2585,7 @@ window.__firebase_config = JSON.stringify({
         }
 
         function abStep() {
-            if (!player || isNaN(player.duration)) return;
+            if (!player || isNaN(player.duration)) { showToast("動画を読み込んでから使ってください", "system"); return; }
             if (abA === null) {
                 abA = player.currentTime;
             } else if (abB === null) {
@@ -3506,6 +3542,7 @@ window.__firebase_config = JSON.stringify({
             .gauge-bar { position: absolute; top: 0; left: 0; height: 100%; width: 30%; background: linear-gradient(90deg, rgba(234,88,12,0) 0%, #ea580c 35%, #ea580c 65%, rgba(234,88,12,0) 100%); animation: gauge-slide 1.4s ease-in-out infinite alternate; }
             @keyframes gauge-slide { from { transform: translateX(0); } to { transform: translateX(233.34%); } }
             .tool-chip { padding: 6px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.25); font-size: 11px; font-weight: 700; color: #fff; background: transparent; }
+            #videoContainer.pseudo-fs { position: fixed !important; top: 0; left: 0; width: 100vw !important; height: 100vh !important; height: 100dvh !important; max-width: none !important; aspect-ratio: auto !important; border-radius: 0 !important; border: 0 !important; z-index: 9999 !important; background: #000 !important; }
             .tool-chip.active { background: var(--accent); border-color: var(--accent); }
             .ts-link { color: var(--accent); font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
             html[data-theme="light"] { --bg-main: #f4f4f5; --bg-surface: #ffffff; --text-main: #18181b; --text-muted: #71717a; --border-color: #d4d4d8; --header-bg: #ffffff; color-scheme: light; }
@@ -3566,6 +3603,7 @@ window.__firebase_config = JSON.stringify({
             const modal = document.getElementById('settingsModal');
             const wrapper = document.getElementById('settingsModalScaleWrapper');
             populateSettingsInputs();
+            updateToolsUI();
             lockBodyScroll();
             modal.classList.remove('hidden');
             setTimeout(() => {
@@ -4285,8 +4323,7 @@ window.__firebase_config = JSON.stringify({
                 playerCol.classList.remove("lg:col-span-2");
                 playerCol.classList.add("lg:col-span-3");
                 
-                theaterBtn.innerHTML = `<i data-lucide="shrink" class="w-5 h-5 text-brandAccent"></i>`;
-                theaterBtn.title = "大画面を解除 (T)";
+                theaterBtn.innerHTML = `<i data-lucide="rectangle-vertical" class="w-5 h-5 text-brandAccent"></i>`;
                 if (!silent) showToast("大画面モード: ON", 'theaterMode');
             } else {
                 grid.classList.remove("max-w-7xl");
@@ -4294,8 +4331,7 @@ window.__firebase_config = JSON.stringify({
                 playerCol.classList.remove("lg:col-span-3");
                 playerCol.classList.add("lg:col-span-2");
                 
-                theaterBtn.innerHTML = `<i data-lucide="expand" class="w-5 h-5"></i>`;
-                theaterBtn.title = "大画面にする (T)";
+                theaterBtn.innerHTML = `<i data-lucide="rectangle-horizontal" class="w-5 h-5"></i>`;
                 if (!silent) showToast("大画面モード: OFF", 'theaterMode');
             }
             lucide.createIcons();
@@ -4687,7 +4723,9 @@ window.__firebase_config = JSON.stringify({
                 const container = document.getElementById("videoContainer");
                 const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
 
-                if (isFullscreen) {
+                if (isPseudoFullscreen()) {
+                    setPseudoFullscreen(false);
+                } else if (isFullscreen) {
                     if (document.exitFullscreen) {
                         document.exitFullscreen().catch(err => console.error("全画面終了に失敗:", err));
                     } else if (document.webkitExitFullscreen) {
@@ -4697,14 +4735,14 @@ window.__firebase_config = JSON.stringify({
                     container.requestFullscreen().catch(err => console.error("全画面開始に失敗:", err));
                 } else if (container.webkitRequestFullscreen) {
                     container.webkitRequestFullscreen();
-                } else if (player && player.webkitEnterFullscreen) {
-                    // iPhone Safariはコンテナ全体の全画面に対応していないため、
-                    // 動画要素自体をネイティブ全画面にする
-                    player.webkitEnterFullscreen();
                 } else {
-                    console.warn("このブラウザは全画面表示に対応していません");
+                    // iPhone Safariはコンテナの全画面に対応していないため、画面いっぱいに広げる疑似全画面にする
+                    setPseudoFullscreen(true);
                 }
             };
+            document.addEventListener('fullscreenchange', updateFullscreenUI);
+            document.addEventListener('webkitfullscreenchange', updateFullscreenUI);
+            updateFullscreenUI();
 
             player.addEventListener("timeupdate", () => {
                 if (isNaN(player.duration)) return;
@@ -4913,6 +4951,41 @@ window.__firebase_config = JSON.stringify({
             });
         }
 
+        // 全画面のとき: 全画面ボタンを「縮める」矢印に、ロックとツールのボタンを表示する
+        function isPseudoFullscreen() {
+            const c = document.getElementById('videoContainer');
+            return !!(c && c.classList.contains('pseudo-fs'));
+        }
+
+        function setPseudoFullscreen(on) {
+            const c = document.getElementById('videoContainer');
+            if (!c) return;
+            if (on === isPseudoFullscreen()) return;
+            c.classList.toggle('pseudo-fs', on);
+            if (on) lockBodyScroll(); else unlockBodyScroll();
+            updateFullscreenUI();
+        }
+
+        function updateFullscreenUI() {
+            const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || isPseudoFullscreen());
+            const fsBtn = document.getElementById('fullscreenBtn');
+            if (fsBtn) {
+                fsBtn.innerHTML = `<i data-lucide="${isFs ? 'shrink' : 'maximize'}" class="w-5 h-5 ${isFs ? 'text-brandAccent' : ''}"></i>`;
+                fsBtn.title = isFs ? '全画面を解除 (F)' : '全画面 (F)';
+            }
+            const lockEl = document.getElementById('lockBtn');
+            const toolsEl = document.getElementById('toolsBtn');
+            if (lockEl) lockEl.classList.toggle('hidden', !isFs);
+            if (toolsEl) toolsEl.classList.toggle('hidden', !isFs);
+            if (!isFs) {
+                const menu = document.getElementById('toolsMenu');
+                if (menu) menu.classList.add('hidden');
+                // 全画面をやめたらロックも外す(ロックボタンが見えない状態で残らないように)
+                if (controlsLocked) unlockControls();
+            }
+            lucide.createIcons();
+        }
+
         function setupKeyboardShortcuts() {
             document.addEventListener("keydown", (e) => {
                 const tag = document.activeElement.tagName.toLowerCase();
@@ -4925,6 +4998,9 @@ window.__firebase_config = JSON.stringify({
                 } else if (e.code === 'KeyF') {
                     e.preventDefault();
                     document.getElementById("fullscreenBtn").click();
+                } else if (e.code === 'Escape' && isPseudoFullscreen()) {
+                    e.preventDefault();
+                    setPseudoFullscreen(false);
                 } else if (e.code === 'KeyT') {
                     e.preventDefault();
                     toggleTheaterMode();
