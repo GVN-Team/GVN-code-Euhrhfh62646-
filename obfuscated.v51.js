@@ -159,13 +159,13 @@ const APP_LAYOUT_HTML = String.raw`
                             </div>
 
                             <div class="flex items-center gap-1.5 sm:gap-4">
-                                <button id="lockBtn" onclick="toggleControlsLock()" class="hidden p-2 text-white hover:text-brandAccent transition-colors flex items-center justify-center min-w-[40px] min-h-[40px] active:scale-90" title="操作ロック">
+                                <button id="lockBtn" onclick="toggleControlsLock()" style="display:none" class="p-2 text-white hover:text-brandAccent transition-colors flex items-center justify-center min-w-[40px] min-h-[40px] active:scale-90" title="操作ロック">
                             <i data-lucide="lock-open" class="w-5 h-5"></i>
                         </button>
                         <button id="airplayBtn" onclick="showAirPlayPicker()" class="hidden p-2 text-white hover:text-brandAccent transition-colors flex items-center justify-center min-w-[40px] min-h-[40px] active:scale-90" title="AirPlay">
                             <i data-lucide="airplay" class="w-5 h-5"></i>
                         </button>
-                        <button id="toolsBtn" onclick="toggleToolsMenu(event)" class="hidden p-2 text-white hover:text-brandAccent transition-colors flex items-center justify-center min-w-[40px] min-h-[40px] active:scale-90" title="ツール">
+                        <button id="toolsBtn" onclick="toggleToolsMenu(event)" style="display:none" class="p-2 text-white hover:text-brandAccent transition-colors flex items-center justify-center min-w-[40px] min-h-[40px] active:scale-90" title="ツール">
                             <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
                         </button>
                         <button id="theaterBtn" onclick="toggleTheaterMode()" class="p-2 text-white hover:text-brandAccent transition-colors hidden sm:flex items-center justify-center min-w-[40px] min-h-[40px]" title="大画面モード切替 (T)">
@@ -3032,6 +3032,7 @@ window.__firebase_config = JSON.stringify({
 
         // ================= 動画URLの保護(期限付きURL) =================
         let downloadCfg = null;
+        let guardSeq = 0;
         let downloadCfgAt = 0;
         let downloadCfgSettled = false;
         let downloadCfgReady = null;
@@ -3144,6 +3145,7 @@ window.__firebase_config = JSON.stringify({
         }
 
         function attachVideoSource(v, autoPlayNow) {
+            applyDownloadGuard();
             const apply = (url) => {
                 if (activeId !== v.id) return;
                 currentPlayUrl = url;
@@ -4424,6 +4426,46 @@ window.__firebase_config = JSON.stringify({
             return { id: id, username: username };
         }
 
+        // 画面に何も出さずに、ダウンロードしてよい人かを判定する(checkDownloadPermission と同じ条件)
+        async function isDownloadAllowedSilent() {
+            let cfg = null;
+            try { cfg = await refreshDownloadCfg(false); } catch (e) { return false; }
+            if (cfg && cfg.restrict === false) return true;
+            if (!cfg) return false;
+            const hasDiscord = !!(currentUserDiscordId || getStoredData('session_discord_id', ''));
+            if (hasDiscord) {
+                const me = await getDiscordIdentity();
+                const list = Array.isArray(cfg.discord) ? cfg.discord : [];
+                if (me.id && me.username && list.some(d => d && String(d.id) === me.id && String(d.username) === me.username)) return true;
+                const roleIds = (Array.isArray(cfg.roleIds) ? cfg.roleIds : []).map(r => (r && typeof r === 'object') ? String(r.id) : String(r));
+                const myRoles = getStoredData('session_discord_roles', []);
+                return Array.isArray(myRoles) && myRoles.some(r => roleIds.includes(String(r)));
+            }
+            const list = Array.isArray(cfg.accounts) ? cfg.accounts : [];
+            return !!currentUser && list.some(n => String(n) === String(currentUser));
+        }
+
+        // ダウンロード権限がない人には、ブラウザの保存ボタン・長押し/右クリックの保存メニュー・ドラッグ保存を出さない
+        async function applyDownloadGuard() {
+            const my = ++guardSeq;
+            const guardOn = () => {
+                player.setAttribute('controlsList', 'nodownload');
+                player.oncontextmenu = (e) => { e.preventDefault(); return false; };
+                player.ondragstart = (e) => { e.preventDefault(); return false; };
+                player.style.webkitTouchCallout = 'none';
+                player.style.userSelect = 'none';
+            };
+            guardOn();
+            let allowed = false;
+            try { allowed = await isDownloadAllowedSilent(); } catch (e) { allowed = false; }
+            if (my !== guardSeq || !allowed) return;
+            player.removeAttribute('controlsList');
+            player.oncontextmenu = null;
+            player.ondragstart = null;
+            player.style.webkitTouchCallout = '';
+            player.style.userSelect = '';
+        }
+
         // ダウンロードしてよい人か確認する(管理画面の「ダウンロード権限の管理」で設定)
         async function checkDownloadPermission() {
             let cfg;
@@ -4975,8 +5017,8 @@ window.__firebase_config = JSON.stringify({
             }
             const lockEl = document.getElementById('lockBtn');
             const toolsEl = document.getElementById('toolsBtn');
-            if (lockEl) lockEl.classList.toggle('hidden', !isFs);
-            if (toolsEl) toolsEl.classList.toggle('hidden', !isFs);
+            if (lockEl) lockEl.style.display = isFs ? 'flex' : 'none';
+            if (toolsEl) toolsEl.style.display = isFs ? 'flex' : 'none';
             if (!isFs) {
                 const menu = document.getElementById('toolsMenu');
                 if (menu) menu.classList.add('hidden');
