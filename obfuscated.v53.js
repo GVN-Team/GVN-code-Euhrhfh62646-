@@ -422,10 +422,10 @@ const APP_LAYOUT_HTML = String.raw`
                     <span class="text-xs text-brandMuted block mb-1 font-bold">コントロールバーの自動非表示</span>
                     <select id="config-controlsHideDelay" class="w-full h-11 px-3 rounded bg-brandBg text-brandText border border-brandBorder outline-none font-bold text-sm" onchange="updateAppConfig('controlsHideDelay', parseInt(this.value))">
                         <option value="0">常に表示する</option>
-                        <option value="2">2秒後に隠す</option>
-                        <option value="3">3秒後に隠す</option>
-                        <option value="5">5秒後に隠す</option>
+                        <option value="6">6秒後に隠す(標準)</option>
                         <option value="10">10秒後に隠す</option>
+                        <option value="15">15秒後に隠す</option>
+                        <option value="30">30秒後に隠す</option>
                     </select>
                 </label>
             </div>
@@ -1047,7 +1047,7 @@ window.__firebase_config = JSON.stringify({
             autoNext: true,
             doubleTapSeek: 10,
             arrowKeySeek: 5,
-            controlsHideDelay: 3,
+            controlsHideDelay: 6,
             theaterModeDefault: false,
             reduceMotion: false,
             defaultSortOrder: "newest",
@@ -1057,6 +1057,7 @@ window.__firebase_config = JSON.stringify({
             theme: "dark"
         };
         const appConfig = Object.assign({}, DEFAULT_APP_CONFIG, getStoredData('app_config', {}));
+        if (appConfig.controlsHideDelay > 0 && appConfig.controlsHideDelay < 6) appConfig.controlsHideDelay = 6;
 
         let searchQuery = "";
         let currentSortOrder = appConfig.defaultSortOrder;
@@ -3545,12 +3546,13 @@ window.__firebase_config = JSON.stringify({
             @keyframes gauge-slide { from { transform: translateX(0); } to { transform: translateX(233.34%); } }
             .tool-chip { padding: 6px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.25); font-size: 11px; font-weight: 700; color: #fff; background: transparent; }
             #videoContainer.pseudo-fs { position: fixed !important; top: 0; left: 0; width: 100vw !important; height: 100vh !important; height: 100dvh !important; max-width: none !important; aspect-ratio: auto !important; border-radius: 0 !important; border: 0 !important; z-index: 9999 !important; background: #000 !important; }
+            #videoContainer.fs-active #playerControls #volumeBar { width: 128px !important; }
             @media (max-width: 600px) and (orientation: portrait) {
                 #videoContainer.fs-active #playerControls { padding: 8px 6px 12px !important; }
                 #videoContainer.fs-active #playerControls button { min-width: 32px !important; min-height: 36px !important; padding: 4px !important; }
                 #videoContainer.fs-active #playerControls div { gap: 2px !important; }
                 #videoContainer.fs-active #playerControls .ml-1 { margin-left: 0 !important; }
-                #videoContainer.fs-active #playerControls #volumeBar { width: 44px !important; }
+                #videoContainer.fs-active #playerControls #volumeBar { width: 60px !important; }
                 #videoContainer.fs-active #playerControls #currentTime, #videoContainer.fs-active #playerControls #duration { width: 36px !important; font-size: 11px !important; }
                 #videoContainer.fs-active #playerControls svg { width: 20px !important; height: 20px !important; }
             }
@@ -4894,7 +4896,7 @@ window.__firebase_config = JSON.stringify({
                 setControlsVisible(true);
                 clearTimeout(controlsTimeout);
                 if (!player.paused) {
-                    controlsTimeout = setTimeout(hideControlsIfIdle, 3000);
+                    controlsTimeout = setTimeout(hideControlsIfIdle, Math.max(appConfig.controlsHideDelay, 6) * 1000);
                 }
             }
 
@@ -5130,7 +5132,7 @@ window.__firebase_config = JSON.stringify({
             setControlsVisible(true);
             clearTimeout(controlsTimeout);
             if (!player.paused && appConfig.controlsHideDelay > 0) {
-                controlsTimeout = setTimeout(hideControlsIfIdle, appConfig.controlsHideDelay * 1000);
+                controlsTimeout = setTimeout(hideControlsIfIdle, Math.max(appConfig.controlsHideDelay, 6) * 1000);
             }
         }
 
