@@ -3547,12 +3547,14 @@ window.__firebase_config = JSON.stringify({
             .tool-chip { padding: 6px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.25); font-size: 11px; font-weight: 700; color: #fff; background: transparent; }
             #videoContainer.pseudo-fs { position: fixed !important; top: 0; left: 0; width: 100vw !important; height: 100vh !important; height: 100dvh !important; max-width: none !important; aspect-ratio: auto !important; border-radius: 0 !important; border: 0 !important; z-index: 9999 !important; background: #000 !important; }
             #videoContainer.fs-active #playerControls #volumeBar { width: 128px !important; }
+            #playerControls button, #playerControls input, #toolsMenu button { touch-action: manipulation; }
+            #videoContainer.fs-active #playerControls { padding-left: max(env(safe-area-inset-left, 0px), 14px) !important; padding-right: max(env(safe-area-inset-right, 0px), 14px) !important; padding-bottom: max(env(safe-area-inset-bottom, 0px) + 8px, 22px) !important; }
             @media (max-width: 600px) and (orientation: portrait) {
-                #videoContainer.fs-active #playerControls { padding: 8px 6px 12px !important; }
-                #videoContainer.fs-active #playerControls button { min-width: 32px !important; min-height: 36px !important; padding: 4px !important; }
+                #videoContainer.fs-active #playerControls { padding: 8px 6px max(env(safe-area-inset-bottom, 0px) + 6px, 14px) !important; }
+                #videoContainer.fs-active #playerControls button { min-width: 30px !important; min-height: 36px !important; padding: 4px !important; }
                 #videoContainer.fs-active #playerControls div { gap: 2px !important; }
                 #videoContainer.fs-active #playerControls .ml-1 { margin-left: 0 !important; }
-                #videoContainer.fs-active #playerControls #volumeBar { width: 60px !important; }
+                #videoContainer.fs-active #playerControls #volumeBar { width: 72px !important; }
                 #videoContainer.fs-active #playerControls #currentTime, #videoContainer.fs-active #playerControls #duration { width: 36px !important; font-size: 11px !important; }
                 #videoContainer.fs-active #playerControls svg { width: 20px !important; height: 20px !important; }
             }
@@ -4901,7 +4903,7 @@ window.__firebase_config = JSON.stringify({
             }
 
             // マウスを動かしたら表示(パソコン用)。タッチは、タップで表示/非表示を切り替える(setupTapToggleControls)
-            container.addEventListener("mousemove", showControls);
+            container.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse') showControls(); });
             ['touchstart', 'pointerdown'].forEach((ev) => {
                 controls.addEventListener(ev, () => { if (!controlsLocked && controlsShown) resetControlsTimeout(); }, { passive: true });
             });
@@ -5003,11 +5005,12 @@ window.__firebase_config = JSON.stringify({
                 }
                 lastTapAt = now;
                 clearTimeout(tapTimer);
+                const wasShown = controlsShown;
                 tapTimer = setTimeout(() => {
                     tapTimer = null;
                     if (controlsLocked) return;
-                    if (controlsShown) { clearTimeout(controlsTimeout); setControlsVisible(false); }
-                    else resetControlsTimeout();
+                    if (wasShown) { clearTimeout(controlsTimeout); setControlsVisible(false); }
+                    else { setControlsVisible(true); resetControlsTimeout(); }
                 }, 280);
             });
         }
@@ -5031,7 +5034,7 @@ window.__firebase_config = JSON.stringify({
             const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || isPseudoFullscreen());
             const fsBtn = document.getElementById('fullscreenBtn');
             if (fsBtn) {
-                fsBtn.innerHTML = `<i data-lucide="${isFs ? 'shrink' : 'maximize'}" class="w-5 h-5 ${isFs ? 'text-brandAccent' : ''}"></i>`;
+                fsBtn.innerHTML = `<i data-lucide="${isFs ? 'minimize' : 'maximize'}" class="w-5 h-5 ${isFs ? 'text-brandAccent' : ''}"></i>`;
                 fsBtn.title = isFs ? '全画面を解除 (F)' : '全画面 (F)';
             }
             const fsBox = document.getElementById('videoContainer');
