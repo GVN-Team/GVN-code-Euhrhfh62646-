@@ -3545,6 +3545,15 @@ window.__firebase_config = JSON.stringify({
             @keyframes gauge-slide { from { transform: translateX(0); } to { transform: translateX(233.34%); } }
             .tool-chip { padding: 6px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.25); font-size: 11px; font-weight: 700; color: #fff; background: transparent; }
             #videoContainer.pseudo-fs { position: fixed !important; top: 0; left: 0; width: 100vw !important; height: 100vh !important; height: 100dvh !important; max-width: none !important; aspect-ratio: auto !important; border-radius: 0 !important; border: 0 !important; z-index: 9999 !important; background: #000 !important; }
+            @media (max-width: 600px) and (orientation: portrait) {
+                #videoContainer.fs-active #playerControls { padding: 8px 6px 12px !important; }
+                #videoContainer.fs-active #playerControls button { min-width: 32px !important; min-height: 36px !important; padding: 4px !important; }
+                #videoContainer.fs-active #playerControls div { gap: 2px !important; }
+                #videoContainer.fs-active #playerControls .ml-1 { margin-left: 0 !important; }
+                #videoContainer.fs-active #playerControls #volumeBar { width: 44px !important; }
+                #videoContainer.fs-active #playerControls #currentTime, #videoContainer.fs-active #playerControls #duration { width: 36px !important; font-size: 11px !important; }
+                #videoContainer.fs-active #playerControls svg { width: 20px !important; height: 20px !important; }
+            }
             .tool-chip.active { background: var(--accent); border-color: var(--accent); }
             .ts-link { color: var(--accent); font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
             html[data-theme="light"] { --bg-main: #f4f4f5; --bg-surface: #ffffff; --text-main: #18181b; --text-muted: #71717a; --border-color: #d4d4d8; --header-bg: #ffffff; color-scheme: light; }
@@ -4885,12 +4894,19 @@ window.__firebase_config = JSON.stringify({
                 setControlsVisible(true);
                 clearTimeout(controlsTimeout);
                 if (!player.paused) {
-                    controlsTimeout = setTimeout(() => setControlsVisible(false), 3000);
+                    controlsTimeout = setTimeout(hideControlsIfIdle, 3000);
                 }
             }
 
             // マウスを動かしたら表示(パソコン用)。タッチは、タップで表示/非表示を切り替える(setupTapToggleControls)
             container.addEventListener("mousemove", showControls);
+            ['touchstart', 'pointerdown'].forEach((ev) => {
+                controls.addEventListener(ev, () => { if (!controlsLocked && controlsShown) resetControlsTimeout(); }, { passive: true });
+            });
+            const toolsMenuEl = document.getElementById('toolsMenu');
+            if (toolsMenuEl) ['touchstart', 'pointerdown'].forEach((ev) => {
+                toolsMenuEl.addEventListener(ev, () => { if (!controlsLocked) resetControlsTimeout(); }, { passive: true });
+            });
             container.addEventListener("dblclick", () => { if (controlsLocked) showUnlockPill(); });
         }
 
@@ -4925,6 +4941,7 @@ window.__firebase_config = JSON.stringify({
             clearTimeout(controlsTimeout);
             setControlsVisible(false);
             updateLockBtnUI();
+            showUnlockPill();
             showToast("操作をロックしました(ダブルタップで「解除」が出ます)", "system");
         }
 
@@ -5015,6 +5032,8 @@ window.__firebase_config = JSON.stringify({
                 fsBtn.innerHTML = `<i data-lucide="${isFs ? 'shrink' : 'maximize'}" class="w-5 h-5 ${isFs ? 'text-brandAccent' : ''}"></i>`;
                 fsBtn.title = isFs ? '全画面を解除 (F)' : '全画面 (F)';
             }
+            const fsBox = document.getElementById('videoContainer');
+            if (fsBox) fsBox.classList.toggle('fs-active', isFs);
             const lockEl = document.getElementById('lockBtn');
             const toolsEl = document.getElementById('toolsBtn');
             if (lockEl) lockEl.style.display = isFs ? 'flex' : 'none';
@@ -5095,6 +5114,15 @@ window.__firebase_config = JSON.stringify({
             if (volumeLevelText) volumeLevelText.textContent = Math.round(val) + '%';
         }
 
+        function hideControlsIfIdle() {
+            const menu = document.getElementById('toolsMenu');
+            if (menu && !menu.classList.contains('hidden')) {
+                controlsTimeout = setTimeout(hideControlsIfIdle, 3000);
+                return;
+            }
+            setControlsVisible(false);
+        }
+
         function resetControlsTimeout() {
             const controls = document.getElementById("playerControls");
             if (!controls) return;
@@ -5102,7 +5130,7 @@ window.__firebase_config = JSON.stringify({
             setControlsVisible(true);
             clearTimeout(controlsTimeout);
             if (!player.paused && appConfig.controlsHideDelay > 0) {
-                controlsTimeout = setTimeout(() => setControlsVisible(false), appConfig.controlsHideDelay * 1000);
+                controlsTimeout = setTimeout(hideControlsIfIdle, appConfig.controlsHideDelay * 1000);
             }
         }
 
@@ -5110,6 +5138,21 @@ window.__firebase_config = JSON.stringify({
         function showToast(msg, category = 'system') {
             if (notificationSettings[category] === false) return;
 
+            const fsBox = document.getElementById('videoContainer');
+            if (fsBox && fsBox.classList.contains('fs-active')) {
+                let ft = document.getElementById('fsToast');
+                if (!ft) {
+                    ft = document.createElement('div');
+                    ft.id = 'fsToast';
+                    ft.style.cssText = 'position:absolute;left:50%;top:56px;transform:translateX(-50%);max-width:88%;z-index:60;background:rgba(0,0,0,0.85);border:1px solid rgba(255,255,255,0.25);color:#fff;font-size:12px;font-weight:700;padding:8px 14px;border-radius:999px;text-align:center;pointer-events:none;transition:opacity .2s;';
+                    fsBox.appendChild(ft);
+                }
+                ft.textContent = msg;
+                ft.style.opacity = '1';
+                clearTimeout(ft._t);
+                ft._t = setTimeout(() => { ft.style.opacity = '0'; }, 2500);
+                return;
+            }
             const toast = document.getElementById('toast');
             const toastMsg = document.getElementById('toastMsg');
             toastMsg.textContent = msg;
