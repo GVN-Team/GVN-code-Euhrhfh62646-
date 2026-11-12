@@ -3545,9 +3545,11 @@ window.__firebase_config = JSON.stringify({
             .gauge-bar { position: absolute; top: 0; left: 0; height: 100%; width: 30%; background: linear-gradient(90deg, rgba(234,88,12,0) 0%, #ea580c 35%, #ea580c 65%, rgba(234,88,12,0) 100%); animation: gauge-slide 1.4s ease-in-out infinite alternate; }
             @keyframes gauge-slide { from { transform: translateX(0); } to { transform: translateX(233.34%); } }
             .tool-chip { padding: 6px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.25); font-size: 11px; font-weight: 700; color: #fff; background: transparent; }
-            #videoContainer.pseudo-fs { position: fixed !important; top: 0; left: 0; width: 100vw !important; height: 100vh !important; height: 100dvh !important; max-width: none !important; aspect-ratio: auto !important; border-radius: 0 !important; border: 0 !important; z-index: 9999 !important; background: #000 !important; }
+            #videoContainer.pseudo-fs { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; width: auto !important; height: auto !important; max-width: none !important; aspect-ratio: auto !important; border-radius: 0 !important; border: 0 !important; z-index: 9999 !important; background: #000 !important; }
             #videoContainer.fs-active #playerControls #volumeBar { width: 128px !important; }
             #playerControls button, #playerControls input, #toolsMenu button { touch-action: manipulation; }
+            #videoContainer.fs-active #playerControls button { position: relative; }
+            #videoContainer.fs-active #playerControls button::after { content: ''; position: absolute; left: -2px; right: -2px; top: 100%; height: 26px; }
             #videoContainer.fs-active #playerControls { padding-left: max(env(safe-area-inset-left, 0px), 14px) !important; padding-right: max(env(safe-area-inset-right, 0px), 14px) !important; padding-bottom: max(env(safe-area-inset-bottom, 0px) + 8px, 22px) !important; }
             @media (max-width: 600px) and (orientation: portrait) {
                 #videoContainer.fs-active #playerControls { padding: 8px 6px max(env(safe-area-inset-bottom, 0px) + 6px, 14px) !important; }
@@ -5021,12 +5023,32 @@ window.__firebase_config = JSON.stringify({
             return !!(c && c.classList.contains('pseudo-fs'));
         }
 
+        function syncPseudoFsBox() {
+            const c = document.getElementById('videoContainer');
+            if (!c) return;
+            const keys = ['top', 'left', 'width', 'height'];
+            const vv = window.visualViewport;
+            if (!c.classList.contains('pseudo-fs') || !vv) { keys.forEach((k) => c.style.removeProperty(k)); return; }
+            c.style.setProperty('top', vv.offsetTop + 'px', 'important');
+            c.style.setProperty('left', vv.offsetLeft + 'px', 'important');
+            c.style.setProperty('width', vv.width + 'px', 'important');
+            c.style.setProperty('height', vv.height + 'px', 'important');
+        }
+
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', syncPseudoFsBox);
+            window.visualViewport.addEventListener('scroll', syncPseudoFsBox);
+        }
+        window.addEventListener('orientationchange', () => setTimeout(syncPseudoFsBox, 300));
+
         function setPseudoFullscreen(on) {
             const c = document.getElementById('videoContainer');
             if (!c) return;
             if (on === isPseudoFullscreen()) return;
             c.classList.toggle('pseudo-fs', on);
             if (on) lockBodyScroll(); else unlockBodyScroll();
+            syncPseudoFsBox();
+            if (on) setTimeout(syncPseudoFsBox, 300);
             updateFullscreenUI();
         }
 
