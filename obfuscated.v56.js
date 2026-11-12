@@ -1788,6 +1788,7 @@ window.__firebase_config = JSON.stringify({
             setupKeyboardShortcuts();
             setupDoubleTapGestures();
             setupAutoFadeControls();
+            initPipButton();
             setupTapToggleControls();
             setupImageSwipeEvents();
         }
@@ -3547,6 +3548,7 @@ window.__firebase_config = JSON.stringify({
             .tool-chip { padding: 6px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.25); font-size: 11px; font-weight: 700; color: #fff; background: transparent; }
             #videoContainer.pseudo-fs { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; width: auto !important; height: auto !important; max-width: none !important; aspect-ratio: auto !important; border-radius: 0 !important; border: 0 !important; z-index: 9999 !important; background: #000 !important; }
             #videoContainer.fs-active #playerControls #volumeBar { width: 128px !important; }
+            @media (max-width: 639px) { #volumeBar { width: 44px !important; } }
             #playerControls button, #playerControls input, #toolsMenu button { touch-action: manipulation; }
             #videoContainer.fs-active #playerControls button { position: relative; }
             #videoContainer.fs-active #playerControls button::after { content: ''; position: absolute; left: -2px; right: -2px; top: 100%; height: 26px; }
@@ -4354,11 +4356,38 @@ window.__firebase_config = JSON.stringify({
             lucide.createIcons();
         }
 
-        function togglePiP() {
-            if (document.pictureInPictureElement) {
-                document.exitPictureInPicture().catch(() => {});
-            } else if (player && document.pictureInPictureEnabled) {
-                player.requestPictureInPicture().catch(() => {});
+        function pipSupported() {
+            if (!player) return false;
+            if (document.pictureInPictureEnabled && player.requestPictureInPicture) return true;
+            return !!(player.webkitSupportsPresentationMode && player.webkitSupportsPresentationMode('picture-in-picture'));
+        }
+
+        function initPipButton() {
+            const btn = document.getElementById('pipBtn');
+            if (!btn) return;
+            if (player) player.removeAttribute('disablePictureInPicture');
+            if (pipSupported()) {
+                btn.classList.remove('hidden', 'sm:flex');
+                btn.style.display = 'flex';
+            } else {
+                btn.style.display = 'none';
+            }
+        }
+
+        async function togglePiP() {
+            try {
+                if (document.pictureInPictureElement) { await document.exitPictureInPicture(); return; }
+                if (player.webkitPresentationMode === 'picture-in-picture') { player.webkitSetPresentationMode('inline'); return; }
+                if (player.readyState === 0) { showToast('動画を読み込んでから使ってください', 'system'); return; }
+                if (document.pictureInPictureEnabled && player.requestPictureInPicture) {
+                    await player.requestPictureInPicture();
+                } else if (player.webkitSupportsPresentationMode && player.webkitSupportsPresentationMode('picture-in-picture')) {
+                    player.webkitSetPresentationMode('picture-in-picture');
+                } else {
+                    showToast('この端末ではピクチャーインピクチャーを使えません', 'system');
+                }
+            } catch (e) {
+                showToast('ピクチャーインピクチャーを開始できませんでした' + (e && e.name ? '(' + e.name + ')' : ''), 'system');
             }
         }
 
