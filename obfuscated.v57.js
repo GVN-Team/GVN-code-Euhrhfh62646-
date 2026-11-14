@@ -1673,6 +1673,19 @@ window.__firebase_config = JSON.stringify({
             window.location.href = DISCORD_CONFIG["verify-url"];
         }
 
+        async function fetchGuildMember(token) {
+            let res = null;
+            for (let i = 0; i < 3; i++) {
+                res = await fetch(`https://discord.com/api/v10/users/@me/guilds/${DISCORD_CONFIG["server-id"]}/member`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (res.status !== 429 && res.status < 500) return res;
+                const ra = Number(res.headers.get('retry-after'));
+                await new Promise(r => setTimeout(r, Math.min(Math.max(isFinite(ra) ? ra * 1000 : 0, 500 * (i + 1)), 3000)));
+            }
+            return res;
+        }
+
         async function handleDiscordCallback() {
             const urlParams = new URLSearchParams(window.location.search);
             const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -1735,9 +1748,13 @@ window.__firebase_config = JSON.stringify({
                 }
 
                 await setStep('サーバーのメンバー情報を取得しています');
-                const guildMemberRes = await fetch(`https://discord.com/api/v10/users/@me/guilds/${DISCORD_CONFIG["server-id"]}/member`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+                const guildMemberRes = await fetchGuildMember(token);
+
+                if (!guildMemberRes.ok && guildMemberRes.status !== 404 && guildMemberRes.status !== 403) {
+                    clearInterval(dotInterval);
+                    displayLoginError(guildMemberRes.status === 429 || guildMemberRes.status >= 500 ? 'Discordが混み合っています。少し待ってからもう一度ログインしてください' : 'Discord認証に失敗しました。もう一度ログインしてください');
+                    return;
+                }
 
                 if (!guildMemberRes.ok) {
                     displayLoginError(`ロールを所持していません<br><a href="${DISCORD_CONFIG["invite-url"]}" target="_blank" class="underline font-bold text-amber-400">${DISCORD_CONFIG["invite-url"]}</a> でロールを購入してください`);
@@ -3099,6 +3116,7 @@ window.__firebase_config = JSON.stringify({
             if (code === 'NO_CRED') return "一度ログアウトして、もう一度ログインしてください";
             if (code === 'download-denied') return "ダウンロード権限が不足しています";
             if (code === 'no-role') return "この動画を見る権限がありません";
+            if (code === 'discord-unavailable') return "Discordの確認が混み合っています。少し待ってから、もう一度お試しください";
             if (code === 'unauthorized') return "ログインの有効期限が切れました。もう一度ログインしてください";
             if (code === 'NETWORK') return "認証サーバーに接続できませんでした";
             return "動画のURLを取得できませんでした (" + ((err && err.message) || '不明') + ")";
@@ -3548,6 +3566,8 @@ window.__firebase_config = JSON.stringify({
             .tool-chip { padding: 6px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.25); font-size: 11px; font-weight: 700; color: #fff; background: transparent; }
             #videoContainer.pseudo-fs { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; width: auto !important; height: auto !important; max-width: none !important; aspect-ratio: auto !important; border-radius: 0 !important; border: 0 !important; z-index: 9999 !important; background: #000 !important; }
             #videoContainer.fs-active #playerControls #volumeBar { width: 128px !important; }
+            #pipBtn { display: none !important; }
+            @media (min-width: 640px), (orientation: landscape) { #pipBtn[data-pip-ok="1"] { display: flex !important; } }
             @media (max-width: 639px) { #volumeBar { width: 44px !important; } }
             #playerControls button, #playerControls input, #toolsMenu button { touch-action: manipulation; }
             #videoContainer.fs-active #playerControls button { position: relative; }
@@ -3915,10 +3935,16 @@ window.__firebase_config = JSON.stringify({
             if (Date.now() - lastChecked < ROLE_CHECK_CACHE_MS) return true; // 直近確認済みならAPIを叩かない
 
             try {
-                const guildMemberRes = await fetch(`https://discord.com/api/v10/users/@me/guilds/${DISCORD_CONFIG["server-id"]}/member`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+                const guildMemberRes = await fetchGuildMember(token);
 
+                if (guildMemberRes.status === 401) {
+                    logout(true);
+                    displayLoginError('ログインの有効期限が切れました。もう一度ログインしてください');
+                    return false;
+                }
+                if (!guildMemberRes.ok && guildMemberRes.status !== 404 && guildMemberRes.status !== 403) {
+                    return true; // 混雑・Discord側の不調では、権限なしにしない(次回また確認する)
+                }
                 if (!guildMemberRes.ok) {
                     showRoleLostOverlay();
                     return false;
@@ -4366,12 +4392,10 @@ window.__firebase_config = JSON.stringify({
             const btn = document.getElementById('pipBtn');
             if (!btn) return;
             if (player) player.removeAttribute('disablePictureInPicture');
-            if (pipSupported()) {
-                btn.classList.remove('hidden', 'sm:flex');
-                btn.style.display = 'flex';
-            } else {
-                btn.style.display = 'none';
-            }
+            btn.classList.remove('hidden', 'sm:flex');
+            // 動画を読み込む前は対応の判定が false になる端末(iPhone)があるので、「明らかに非対応」のときだけ隠す
+            const maybe = !!(document.pictureInPictureEnabled || (player && (typeof player.webkitSetPresentationMode === 'function' || typeof player.requestPictureInPicture === 'function')));
+            btn.setAttribute('data-pip-ok', maybe ? '1' : '0');
         }
 
         async function togglePiP() {
