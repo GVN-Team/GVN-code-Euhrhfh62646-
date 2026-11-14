@@ -3566,7 +3566,10 @@ window.__firebase_config = JSON.stringify({
             .tool-chip { padding: 6px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.25); font-size: 11px; font-weight: 700; color: #fff; background: transparent; }
             #videoContainer.pseudo-fs { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; width: auto !important; height: auto !important; max-width: none !important; aspect-ratio: auto !important; border-radius: 0 !important; border: 0 !important; z-index: 9999 !important; background: #000 !important; }
             #videoContainer.fs-active #playerControls #volumeBar { width: 128px !important; }
+            body.fs-on { background: #000 !important; }
+            body.fs-on header, body.fs-on footer, body.fs-on #mainLayoutGrid > :not(#playerColumn), body.fs-on #playerColumn > :not(#videoContainer) { display: none !important; }
             #pipBtn { display: none !important; }
+            #videoContainer.fs-active #pipBtn[data-pip-ok="1"] { display: flex !important; }
             @media (min-width: 640px), (orientation: landscape) { #pipBtn[data-pip-ok="1"] { display: flex !important; } }
             @media (max-width: 639px) { #volumeBar { width: 44px !important; } }
             #playerControls button, #playerControls input, #toolsMenu button { touch-action: manipulation; }
@@ -5098,8 +5101,15 @@ window.__firebase_config = JSON.stringify({
             const c = document.getElementById('videoContainer');
             if (!c) return;
             if (on === isPseudoFullscreen()) return;
-            c.classList.toggle('pseudo-fs', on);
-            if (on) lockBodyScroll(); else unlockBodyScroll();
+            if (on) {
+                lockBodyScroll();
+                c.classList.add('pseudo-fs');
+                document.body.classList.add('fs-on');
+            } else {
+                document.body.classList.remove('fs-on');
+                c.classList.remove('pseudo-fs');
+                unlockBodyScroll();
+            }
             syncPseudoFsBox();
             if (on) setTimeout(syncPseudoFsBox, 300);
             updateFullscreenUI();
