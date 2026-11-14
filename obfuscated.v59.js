@@ -4402,19 +4402,29 @@ window.__firebase_config = JSON.stringify({
         }
 
         async function togglePiP() {
+            const webkitOk = () => typeof player.webkitSetPresentationMode === 'function'
+                && (typeof player.webkitSupportsPresentationMode !== 'function' || player.webkitSupportsPresentationMode('picture-in-picture'));
             try {
                 if (document.pictureInPictureElement) { await document.exitPictureInPicture(); return; }
                 if (player.webkitPresentationMode === 'picture-in-picture') { player.webkitSetPresentationMode('inline'); return; }
                 if (player.readyState === 0) { showToast('動画を読み込んでから使ってください', 'system'); return; }
+                // iPhone/Safariは独自の方式のほうが確実なので、先に試す
+                if (webkitOk()) {
+                    player.webkitSetPresentationMode('picture-in-picture');
+                    return;
+                }
                 if (document.pictureInPictureEnabled && player.requestPictureInPicture) {
                     await player.requestPictureInPicture();
-                } else if (player.webkitSupportsPresentationMode && player.webkitSupportsPresentationMode('picture-in-picture')) {
-                    player.webkitSetPresentationMode('picture-in-picture');
-                } else {
-                    showToast('この端末ではピクチャーインピクチャーを使えません', 'system');
+                    return;
                 }
+                showToast('この端末ではピクチャーインピクチャーを使えません', 'system');
             } catch (e) {
-                showToast('ピクチャーインピクチャーを開始できませんでした' + (e && e.name ? '(' + e.name + ')' : ''), 'system');
+                // 失敗したときは、もう一方の方式も試す
+                try {
+                    if (webkitOk()) { player.webkitSetPresentationMode('picture-in-picture'); return; }
+                } catch (e2) { e = e2; }
+                const sup = typeof player.webkitSupportsPresentationMode === 'function' ? String(player.webkitSupportsPresentationMode('picture-in-picture')) : 'なし';
+                showToast('ピクチャーインピクチャーを開始できませんでした(' + ((e && e.name) || 'error') + ' / webkit対応:' + sup + ' / 読込:' + player.readyState + ')', 'system');
             }
         }
 
