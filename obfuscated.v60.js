@@ -91,9 +91,7 @@ const APP_LAYOUT_HTML = String.raw`
                         <div id="playerColumn" class="lg:col-span-2 space-y-5 sm:space-y-6 transition-all duration-300">
                 <div id="videoContainer" class="relative w-full aspect-video bg-black rounded-theme overflow-hidden shadow-2xl border border-brandBorder group transition-all duration-300">
                     
-                                        <video id="mainPlayer" class="w-full h-full object-contain" playsinline>
-                        <source id="playerSource" src="" type="video/mp4">
-                    </video>
+                                        <div id="playerHost" class="w-full h-full" style="display:block;"></div>
 
                                         <div id="imageViewer" class="absolute inset-0 z-[25] hidden bg-black flex-col overflow-hidden">
                                                 <div id="imageTrack" class="flex w-full h-full transition-transform duration-300 ease-out touch-pan-y">
@@ -2633,6 +2631,7 @@ window.__firebase_config = JSON.stringify({
         }
 
         async function hostAllowsCors(url) {
+            if (/\/stream\/[^/]+$/.test(String(url))) return true; // 認証サーバー経由の配信は、サイト用のCORS設定済み
             try {
                 const ctrl = new AbortController();
                 const timer = setTimeout(() => ctrl.abort(), 8000);
@@ -3171,6 +3170,7 @@ window.__firebase_config = JSON.stringify({
                 currentPlayUrl = url;
                 playerSrc.src = url;
                 player.load();
+                try { performance.clearResourceTimings(); } catch (e) {}
             };
             const deferred = (factory) => {
                 playerSrc.removeAttribute('src');
@@ -3827,8 +3827,22 @@ window.__firebase_config = JSON.stringify({
 
         let activeId = 1;
         let hasLoadedInitialMedia = false;
-        const player = document.getElementById("mainPlayer");
-        const playerSrc = document.getElementById("playerSource");
+        try { performance.setResourceTimingBufferSize(0); } catch (e) {}
+        // 動画要素はページの外から見つけられないよう、閉じたShadow DOMの中に置き、<source>も使わない
+        const playerHost = document.getElementById("playerHost");
+        const playerRoot = playerHost.attachShadow({ mode: 'closed' });
+        const player = document.createElement('video');
+        player.setAttribute('playsinline', '');
+        player.setAttribute('webkit-playsinline', '');
+        const playerStyle = document.createElement('style');
+        playerStyle.textContent = ':host{display:block;width:100%;height:100%;}video{display:block;width:100%;height:100%;object-fit:contain;background:#000;}';
+        playerRoot.appendChild(playerStyle);
+        playerRoot.appendChild(player);
+        const playerSrc = {
+            get src() { return player.getAttribute('src') || ''; },
+            set src(v) { player.src = v; },
+            removeAttribute(n) { if (n === 'src') player.removeAttribute('src'); }
+        };
         const vTitle = document.getElementById("videoTitle");
         const vDate = document.getElementById("videoDate");
         const vDesc = document.getElementById("videoDesc");
