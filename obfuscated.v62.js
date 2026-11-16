@@ -1805,6 +1805,8 @@ window.__firebase_config = JSON.stringify({
             setupAutoFadeControls();
             initPipButton();
             setupUrlRecovery();
+            initFlyingMarks();
+            initStatsUi();
             setupTapToggleControls();
             setupImageSwipeEvents();
         }
@@ -2296,11 +2298,13 @@ window.__firebase_config = JSON.stringify({
             savePending = true;
             const prev = userSaved.slice();
             const index = userSaved.indexOf(activeId);
+            const savedVid = activeId;
             if (index >= 0) userSaved.splice(index, 1); else userSaved.push(activeId);
             updateSaveBtnUI();
             renderPlaylist();
             try {
                 await pushSavedToCloud(userSaved);
+                trackEvent(index >= 0 ? 'unsave' : 'save', savedVid).then(r => { if (r && r.json && r.json.counted) bumpStat(savedVid, 'saves', index >= 0 ? -1 : 1); });
                 showToast(index >= 0 ? "「あとで見る」から削除しました" : "「あとで見る」に追加しました", "watchLater");
             } catch (e) {
                 userSaved = prev;
@@ -2803,6 +2807,11 @@ window.__firebase_config = JSON.stringify({
         let socialReactions = [];
         let commentSending = false;
         let lastCommentAt = 0;
+        let replyTarget = null;
+        let statsMap = {};
+        let statsLoadedAt = 0;
+        let viewTimer = null;
+        const trackSid = Math.random().toString(36).slice(2) + Date.now().toString(36);
 
         function getLikesAuth() {
             if (likesAuthPromise) return likesAuthPromise;
@@ -2900,6 +2909,7 @@ window.__firebase_config = JSON.stringify({
 
             const cc = document.getElementById('commentCount');
             if (cc) cc.textContent = socialComments.length > 0 ? String(socialComments.length) : '';
+            renderStatsLine();
             list.innerHTML = '';
             if (socialComments.length === 0) {
                 const p = document.createElement('p');
@@ -2908,7 +2918,16 @@ window.__firebase_config = JSON.stringify({
                 list.appendChild(p);
                 return;
             }
+            const ids = new Set(socialComments.map(c => c._id));
+            const repliesOf = new Map();
+            const tops = [];
             socialComments.forEach(c => {
+                if (c.parentId && ids.has(c.parentId)) {
+                    if (!repliesOf.has(c.parentId)) repliesOf.set(c.parentId, []);
+                    repliesOf.get(c.parentId).push(c);
+                } else tops.push(c);
+            });
+            const buildRow = (c) => {
                 const row = document.createElement('div');
                 row.className = 'bg-brandBg border border-brandBorder rounded-xl px-3 py-2.5';
                 const head = document.createElement('div');
@@ -2922,6 +2941,13 @@ window.__firebase_config = JSON.stringify({
                 when.className = 'text-[10px] text-brandMuted';
                 when.textContent = formatAgo(c.createdAt || 0);
                 right.appendChild(when);
+                if (currentUser) {
+                    const rep = document.createElement('button');
+                    rep.className = 'text-[10px] text-brandMuted hover:text-brandAccent transition-colors p-1';
+                    rep.textContent = '返信';
+                    rep.onclick = () => startReply(c);
+                    right.appendChild(rep);
+                }
                 if (likesUid && c.uid === likesUid) {
                     const del = document.createElement('button');
                     del.className = 'text-[10px] text-brandMuted hover:text-red-500 transition-colors p-1';
@@ -2936,7 +2962,19 @@ window.__firebase_config = JSON.stringify({
                 text.textContent = c.text || '';
                 row.appendChild(head);
                 row.appendChild(text);
-                list.appendChild(row);
+                return row;
+            };
+            tops.forEach(c => {
+                const wrap = document.createElement('div');
+                wrap.appendChild(buildRow(c));
+                const rs = (repliesOf.get(c._id) || []).sort((x, y) => (x.createdAt || 0) - (y.createdAt || 0));
+                if (rs.length) {
+                    const box = document.createElement('div');
+                    box.className = 'ml-4 mt-1.5 pl-2 border-l border-brandBorder space-y-1.5';
+                    rs.forEach(r => box.appendChild(buildRow(r)));
+                    wrap.appendChild(box);
+                }
+                list.appendChild(wrap);
             });
         }
 
@@ -2944,6 +2982,9 @@ window.__firebase_config = JSON.stringify({
             socialVideoId = videoId;
             socialComments = [];
             socialReactions = [];
+            replyTarget = null;
+            updateReplyBanner();
+            onVideoSelectedForStats(videoId);
             renderSocial();
             if (!likesUid) getLikesAuth().then(() => renderSocial()).catch(() => {});
             try {
@@ -3001,6 +3042,198 @@ window.__firebase_config = JSON.stringify({
             }
         }
 
+        // ================= 透かし・回数・返信 =================
+        const WATERMARK_TEXT = (typeof window.APP_WATERMARK_TEXT === 'string' && window.APP_WATERMARK_TEXT) || 'gvn-org.onrender.com';
+
+        // 動画の上に、文字をいろんな方向へ飛ばす(画面の端で跳ね返る)
+        function initFlyingMarks() {
+            const box = document.getElementById('videoContainer');
+            if (!box || document.getElementById('flyMarks')) return;
+            const layer = document.createElement('div');
+            layer.id = 'flyMarks';
+            layer.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;overflow:hidden;pointer-events:none;z-index:27;';
+            box.appendChild(layer);
+            const marks = [];
+            for (let i = 0; i < 5; i++) {
+                const el = document.createElement('span');
+                el.textContent = WATERMARK_TEXT;
+                el.style.cssText = 'position:absolute;left:0;top:0;white-space:nowrap;font:700 12px/1 "IBM Plex Mono",monospace;color:#fff;opacity:.3;text-shadow:0 0 4px rgba(0,0,0,.9);will-change:transform;user-select:none;-webkit-user-select:none;';
+                layer.appendChild(el);
+                const ang = Math.random() * Math.PI * 2;
+                const sp = 28 + Math.random() * 42;
+                marks.push({ el, x: Math.random() * 240, y: Math.random() * 160, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, w: 0, h: 0, rot: Math.random() * 70 - 35, turnAt: performance.now() + 4000 + Math.random() * 6000 });
+            }
+            let last = performance.now();
+            function frame(now) {
+                const dt = Math.min(0.1, (now - last) / 1000);
+                last = now;
+                const W = layer.clientWidth, H = layer.clientHeight;
+                if (W > 0 && H > 0) {
+                    const fs = Math.max(10, Math.min(18, Math.round(W / 38)));
+                    marks.forEach(m => {
+                        if (m.fs !== fs) { m.fs = fs; m.el.style.fontSize = fs + 'px'; m.w = m.el.offsetWidth; m.h = m.el.offsetHeight; }
+                        if (now > m.turnAt) {
+                            const a = Math.random() * Math.PI * 2, sp = 28 + Math.random() * 42;
+                            m.vx = Math.cos(a) * sp; m.vy = Math.sin(a) * sp;
+                            m.turnAt = now + 4000 + Math.random() * 6000;
+                        }
+                        m.x += m.vx * dt; m.y += m.vy * dt;
+                        if (m.x < 0) { m.x = 0; m.vx = Math.abs(m.vx); } else if (m.x > W - m.w) { m.x = Math.max(0, W - m.w); m.vx = -Math.abs(m.vx); }
+                        if (m.y < 0) { m.y = 0; m.vy = Math.abs(m.vy); } else if (m.y > H - m.h) { m.y = Math.max(0, H - m.h); m.vy = -Math.abs(m.vy); }
+                        m.el.style.transform = 'translate(' + m.x.toFixed(1) + 'px,' + m.y.toFixed(1) + 'px) rotate(' + m.rot.toFixed(0) + 'deg)';
+                    });
+                }
+                requestAnimationFrame(frame);
+            }
+            requestAnimationFrame(frame);
+        }
+
+        // 保存する画像に、文字をいろんな向きで重ねる
+        async function stampImageBlob(blob) {
+            try {
+                const bmp = await createImageBitmap(blob);
+                const c = document.createElement('canvas');
+                c.width = bmp.width;
+                c.height = bmp.height;
+                const ctx = c.getContext('2d');
+                ctx.drawImage(bmp, 0, 0);
+                const fs = Math.max(14, Math.round(Math.min(c.width, c.height) / 26));
+                ctx.font = '700 ' + fs + 'px "IBM Plex Mono", monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                ctx.shadowBlur = fs / 4;
+                ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                const spots = [[0.22, 0.18, -0.5], [0.75, 0.25, 0.35], [0.45, 0.5, -0.15], [0.2, 0.78, 0.6], [0.78, 0.8, -0.7], [0.5, 0.12, 0.1], [0.5, 0.88, -0.3]];
+                spots.forEach(([fx, fy, ang]) => {
+                    ctx.save();
+                    ctx.translate(c.width * fx, c.height * fy);
+                    ctx.rotate(ang);
+                    ctx.fillText(WATERMARK_TEXT, 0, 0);
+                    ctx.restore();
+                });
+                return await new Promise(res => c.toBlob(b => res(b || blob), 'image/jpeg', 0.92));
+            } catch (e) {
+                return blob;
+            }
+        }
+
+        // ---- 回数(再生・共有・保存)と同時視聴の確認 ----
+        function trackBase() { return String(AUTH_SERVER_URL || '').trim().replace(/\/+$/, ''); }
+
+        async function trackEvent(kind, videoId) {
+            const base = trackBase();
+            const cred = gateCredentials();
+            if (!base || !cred || !Number.isInteger(videoId)) return null;
+            try {
+                const res = await fetch(base + '/track', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(Object.assign({ siteId: window.APP_UNIQUE_ID, videoId: videoId, kind: kind, sid: trackSid }, cred)),
+                    keepalive: true
+                });
+                return { status: res.status, json: await res.json().catch(() => ({})) };
+            } catch (e) { return null; }
+        }
+
+        function bumpStat(videoId, field, d) {
+            const k = String(videoId);
+            if (!statsMap[k]) statsMap[k] = { views: 0, shares: 0, saves: 0 };
+            statsMap[k][field] = Math.max(0, (statsMap[k][field] || 0) + d);
+            renderStatsLine();
+        }
+
+        async function loadStats() {
+            const base = trackBase();
+            if (!base) return;
+            statsLoadedAt = Date.now();
+            try {
+                const res = await fetch(base + '/stats?siteId=' + encodeURIComponent(window.APP_UNIQUE_ID));
+                const j = await res.json();
+                if (j && j.success) { statsMap = j.stats || {}; renderStatsLine(); }
+            } catch (e) {}
+        }
+
+        function renderStatsLine() {
+            const el = document.getElementById('statsLine');
+            if (!el) return;
+            const s = statsMap[String(activeId)] || {};
+            const hasSrv = !!trackBase();
+            const parts = [];
+            if (hasSrv) parts.push('再生 ' + (s.views || 0));
+            parts.push('いいね ' + socialReactions.length);
+            if (hasSrv) { parts.push('保存 ' + (s.saves || 0)); parts.push('共有 ' + (s.shares || 0)); }
+            parts.push('コメント ' + socialComments.length);
+            el.textContent = parts.join(' ・ ');
+        }
+
+        function onVideoSelectedForStats(videoId) {
+            clearTimeout(viewTimer);
+            renderStatsLine();
+            if (Date.now() - statsLoadedAt > 20000) loadStats();
+            viewTimer = setTimeout(() => {
+                if (activeId !== videoId) return;
+                const v = videos.find(x => x.id === videoId);
+                const isImg = !!(v && (v.type === 'image' || v.images));
+                if (!isImg && player.paused) return;
+                trackEvent('view', videoId).then(r => { if (r && r.json && r.json.counted) bumpStat(videoId, 'views', 1); });
+            }, 5000);
+        }
+
+        async function sendHeartbeat() {
+            if (!trackBase() || player.paused || player.ended || activeId == null) return;
+            const r = await trackEvent('heartbeat', activeId);
+            if (r && r.status === 429 && r.json && r.json.error === 'too-many-streams') {
+                player.pause();
+                showToast('同じアカウントで同時に見られるのは' + (r.json.limit || '') + '台までです', 'system');
+            }
+        }
+
+        function initStatsUi() {
+            const h1 = document.getElementById('videoTitle');
+            if (h1 && !document.getElementById('statsLine')) {
+                const p = document.createElement('p');
+                p.id = 'statsLine';
+                p.className = 'text-[11px] text-brandMuted font-mono mt-1.5';
+                h1.insertAdjacentElement('afterend', p);
+            }
+            loadStats();
+            player.addEventListener('playing', () => { sendHeartbeat(); });
+            setInterval(sendHeartbeat, 30000);
+        }
+
+        // ---- コメントへの返信 ----
+        function updateReplyBanner() {
+            const input = document.getElementById('commentInput');
+            if (!input) return;
+            let bar = document.getElementById('replyBanner');
+            if (!replyTarget) { if (bar) bar.remove(); return; }
+            if (!bar) {
+                bar = document.createElement('div');
+                bar.id = 'replyBanner';
+                bar.className = 'flex items-center justify-between gap-2 text-[11px] text-brandAccent bg-brandBg border border-brandBorder rounded-lg px-3 py-1.5 mb-2';
+                const row = input.parentNode;
+                row.parentNode.insertBefore(bar, row);
+            }
+            bar.innerHTML = '';
+            const label = document.createElement('span');
+            label.className = 'truncate';
+            label.textContent = (replyTarget.name || '名無し') + ' さんに返信';
+            const x = document.createElement('button');
+            x.className = 'text-brandMuted hover:text-red-500 p-1';
+            x.textContent = '×';
+            x.onclick = () => { replyTarget = null; updateReplyBanner(); };
+            bar.appendChild(label);
+            bar.appendChild(x);
+        }
+
+        function startReply(c) {
+            replyTarget = { id: c.parentId || c._id, name: c.name };
+            updateReplyBanner();
+            const input = document.getElementById('commentInput');
+            if (input) { input.focus(); }
+        }
+
         async function postComment() {
             if (!currentUser || commentSending) return;
             const input = document.getElementById('commentInput');
@@ -3022,10 +3255,13 @@ window.__firebase_config = JSON.stringify({
                     uid: { stringValue: likesUid },
                     createdAt: { integerValue: String(Date.now()) }
                 } };
+                if (replyTarget && replyTarget.id) body.fields.parentId = { stringValue: String(replyTarget.id).slice(0, 64) };
                 const res = await savesFetch(LIKES_DOCS + '/comments', { method: 'POST', headers: headers, body: JSON.stringify(body) });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const created = plainDoc(await res.json());
                 input.value = '';
+                replyTarget = null;
+                updateReplyBanner();
                 lastCommentAt = Date.now();
                 if (socialVideoId === videoId) { socialComments.unshift(created); renderSocial(); }
                 setCommentStatus('');
@@ -4586,10 +4822,12 @@ window.__firebase_config = JSON.stringify({
                     if (shareText) payload.text = shareText;
                     await navigator.share(payload);
                     showToast("共有メニューを開きました", 'share');
+                    if (cur) trackEvent('share', cur.id).then(r => { if (r && r.json && r.json.counted) bumpStat(cur.id, 'shares', 1); });
                 } catch (error) {}
             } else {
                 const temp = document.createElement("input"); temp.value = finalShareUrl; document.body.appendChild(temp); temp.select(); document.execCommand("copy"); document.body.removeChild(temp);
                 showToast("リンクをコピーしました", 'share');
+                if (cur) trackEvent('share', cur.id).then(r => { if (r && r.json && r.json.counted) bumpStat(cur.id, 'shares', 1); });
             }
         }
 
@@ -4749,7 +4987,7 @@ window.__firebase_config = JSON.stringify({
                 const imgUrl = signedDl || currentImages[currentImageIndex];
                 try {
                     const res = await fetch(imgUrl);
-                    const blob = await res.blob();
+                    const blob = await stampImageBlob(await res.blob());
                     const blobUrl = URL.createObjectURL(blob);
                     const a = document.createElement("a");
                     a.href = blobUrl; 
