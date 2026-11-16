@@ -1804,6 +1804,7 @@ window.__firebase_config = JSON.stringify({
             setupDoubleTapGestures();
             setupAutoFadeControls();
             initPipButton();
+            setupUrlRecovery();
             setupTapToggleControls();
             setupImageSwipeEvents();
         }
@@ -2631,6 +2632,7 @@ window.__firebase_config = JSON.stringify({
         }
 
         async function hostAllowsCors(url) {
+            if (String(url).startsWith('blob:')) return true;
             if (/\/stream\/[^/]+$/.test(String(url))) return true; // 認証サーバー経由の配信は、サイト用のCORS設定済み
             try {
                 const ctrl = new AbortController();
@@ -3051,6 +3053,13 @@ window.__firebase_config = JSON.stringify({
         // ================= 動画URLの保護(期限付きURL) =================
         let downloadCfg = null;
         let guardSeq = 0;
+        let allowedCache = { key: null, v: null };
+        let activeBlobUrl = null;
+        let blobAbort = null;
+        // ダウンロード権限のない人は、動画を端末内(blob:)に読み込んでから再生する。これより大きい動画は通常再生(0で無効)
+        const BLOB_PLAY_MAX_MB = (typeof window.BLOB_PLAY_MAX_MB === 'number') ? window.BLOB_PLAY_MAX_MB : 300;
+        function allowedKey() { return String(currentUserDiscordId || getStoredData('session_discord_id', '') || currentUser || ''); }
+        function cachedAllowed() { return allowedCache.key === allowedKey() ? allowedCache.v : null; }
         let downloadCfgAt = 0;
         let downloadCfgSettled = false;
         let downloadCfgReady = null;
@@ -3082,7 +3091,7 @@ window.__firebase_config = JSON.stringify({
             return tk ? { token: tk } : null;
         }
 
-        async function signMediaUrls(urls, mode) {
+        async function signMediaUrls(urls, mode, ttlSec) {
             const cred = gateCredentials();
             if (!cred) { const e = new Error('NO_CRED'); e.code = 'NO_CRED'; throw e; }
             const base = String(AUTH_SERVER_URL || '').trim().replace(/\/+$/, '');
@@ -3093,7 +3102,7 @@ window.__firebase_config = JSON.stringify({
                 res = await fetch(base + '/sign', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(Object.assign({ siteId: window.APP_UNIQUE_ID, urls: urls, mode: mode }, cred)),
+                    body: JSON.stringify(Object.assign({ siteId: window.APP_UNIQUE_ID, urls: urls, mode: mode }, ttlSec ? { ttl: ttlSec } : {}, cred)),
                     signal: ctrl.signal
                 });
             } catch (e) {
@@ -3157,14 +3166,110 @@ window.__firebase_config = JSON.stringify({
             if (activeId === v.id) setupImageViewer(v.images);
         }
 
-        async function resolvePlayUrl(v) {
-            const json = await signMediaUrls([v.url], 'play');
+        // 動画のURLは、選ぶたびに新しく作る。有効期限は「動画の長さ+10分」(長さが不明、または full のときは従来の長さ)
+        async function resolvePlayUrl(v, full) {
+            const dur = parseDurationSec(v.duration);
+            const json = await signMediaUrls([v.url], 'play', (!full && dur > 0) ? dur + 600 : 0);
             signedMedia.set(v.url, { url: json.urls[0], exp: json.signed[0] ? json.expiresAt : Infinity });
             return json.urls[0];
         }
 
+        let blobDotTimer = null;
+        function showBlobProgress(pct) {
+            let box = document.getElementById('blobProgress');
+            if (!box) {
+                box = document.createElement('div');
+                box.id = 'blobProgress';
+                box.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:45;background:rgba(0,0,0,0.78);border:1px solid rgba(47,232,200,0.5);color:#2fe8c8;font:700 13px "IBM Plex Mono",monospace;padding:10px 16px;border-radius:12px;pointer-events:none;box-shadow:0 0 18px rgba(47,232,200,0.25);white-space:nowrap;';
+                document.getElementById('videoContainer').appendChild(box);
+            }
+            const frames = ['\u2024', '\u2025', '\u2026'];
+            let i = 0;
+            const draw = () => { box.textContent = '読み込み中 ' + (pct.v === null ? '' : pct.v + '% ') + frames[i++ % 3]; };
+            box.style.display = 'block';
+            clearInterval(blobDotTimer);
+            draw();
+            blobDotTimer = setInterval(draw, 100);
+        }
+
+        function hideBlobProgress() {
+            clearInterval(blobDotTimer);
+            const box = document.getElementById('blobProgress');
+            if (box) box.style.display = 'none';
+        }
+
+        // 動画を端末の中に読み込み、blob: のURLにして返す。大きすぎる・失敗したときは null(=通常再生)
+        async function loadAsBlob(url) {
+            const ctrl = new AbortController();
+            blobAbort = ctrl;
+            const cap = BLOB_PLAY_MAX_MB * 1048576;
+            const pct = { v: null };
+            showBlobProgress(pct);
+            try {
+                const res = await fetch(url, { signal: ctrl.signal, mode: 'cors' });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const total = Number(res.headers.get('content-length')) || 0;
+                if (total > cap) { try { res.body.cancel(); } catch (e) {} return null; }
+                const ct = String(res.headers.get('content-type') || '');
+                const type = ct.startsWith('video/') ? ct : 'video/mp4';
+                if (!res.body || !res.body.getReader) {
+                    const b = await res.blob();
+                    return URL.createObjectURL(new Blob([b], { type }));
+                }
+                const reader = res.body.getReader();
+                const chunks = [];
+                let loaded = 0;
+                for (;;) {
+                    const r = await reader.read();
+                    if (r.done) break;
+                    chunks.push(r.value);
+                    loaded += r.value.length;
+                    if (loaded > cap) { try { ctrl.abort(); } catch (e) {} return null; }
+                    pct.v = total ? Math.min(99, Math.floor(loaded / total * 100)) : null;
+                }
+                return URL.createObjectURL(new Blob(chunks, { type }));
+            } catch (e) {
+                if (!(e && e.name === 'AbortError')) showToast('保護再生の読み込みに失敗したため、通常再生にします', 'system');
+                return null;
+            } finally {
+                if (blobAbort === ctrl) blobAbort = null;
+                hideBlobProgress();
+            }
+        }
+
+        let urlRecovering = false;
+        function setupUrlRecovery() {
+        player.addEventListener('error', async () => {
+            if (urlRecovering || !gateOn() || activeBlobUrl) return;
+            const v = videos.find(x => x.id === activeId);
+            if (!v) return;
+            const h = signedMedia.get(v.url);
+            if (!h || h.exp > Date.now() + 2000) return;
+            urlRecovering = true;
+            const t = player.currentTime;
+            const was = !player.paused;
+            try {
+                const url = await resolvePlayUrl(v, true);
+                if (activeId !== v.id) return;
+                currentPlayUrl = url;
+                playerSrc.src = url;
+                player.load();
+                player.addEventListener('loadedmetadata', function once() {
+                    player.removeEventListener('loadedmetadata', once);
+                    try { player.currentTime = t; } catch (e) {}
+                    if (was) player.play().catch(() => {});
+                });
+            } catch (e) { showToast(gateErrorMessage(e), 'system'); }
+            finally { urlRecovering = false; }
+        });
+        }
+
         function attachVideoSource(v, autoPlayNow) {
             applyDownloadGuard();
+            if (blobAbort) { try { blobAbort.abort(); } catch (e) {} blobAbort = null; }
+            hideBlobProgress();
+            if (activeBlobUrl) { URL.revokeObjectURL(activeBlobUrl); activeBlobUrl = null; }
+            const needBlob = () => BLOB_PLAY_MAX_MB > 0 && cachedAllowed() !== true;
             const apply = (url) => {
                 if (activeId !== v.id) return;
                 currentPlayUrl = url;
@@ -3175,8 +3280,22 @@ window.__firebase_config = JSON.stringify({
             const deferred = (factory) => {
                 playerSrc.removeAttribute('src');
                 player.load();
-                factory().then((url) => {
+                (async () => {
+                    let url = await factory();
                     if (activeId !== v.id) return;
+                    if (BLOB_PLAY_MAX_MB > 0) {
+                        let allowed = cachedAllowed();
+                        if (allowed === null) {
+                            try { allowed = await isDownloadAllowedSilent(); } catch (e) { allowed = false; }
+                            allowedCache = { key: allowedKey(), v: allowed };
+                        }
+                        if (activeId !== v.id) return;
+                        if (!allowed) {
+                            const b = await loadAsBlob(url);
+                            if (activeId !== v.id) { if (b) URL.revokeObjectURL(b); return; }
+                            if (b) { activeBlobUrl = b; url = b; }
+                        }
+                    }
                     apply(url);
                     // 非同期で読み込んだ場合は、最初の再生開始が間に合わないのでここで再生する
                     if (autoPlayNow && document.getElementById('resumeModal').classList.contains('hidden')) {
@@ -3185,9 +3304,10 @@ window.__firebase_config = JSON.stringify({
                             lucide.createIcons();
                         }).catch(() => {});
                     }
-                }).catch((err) => {
+                })().catch((err) => {
                     if (activeId !== v.id) return;
                     videoSpinner.classList.add('hidden');
+                    hideBlobProgress();
                     showToast(gateErrorMessage(err), "system");
                 });
             };
@@ -3198,9 +3318,11 @@ window.__firebase_config = JSON.stringify({
                 });
                 return;
             }
-            if (!gateOn()) { currentPlayUrl = v.url; playerSrc.src = v.url; player.load(); return; }
-            const hit = signedMedia.get(v.url);
-            if (hit && hit.exp - Date.now() > 10 * 60000) { apply(hit.url); return; }
+            if (!gateOn()) {
+                if (needBlob()) { deferred(async () => v.url); return; }
+                currentPlayUrl = v.url; playerSrc.src = v.url; player.load();
+                return;
+            }
             deferred(() => resolvePlayUrl(v));
         }
 
@@ -4553,6 +4675,7 @@ window.__firebase_config = JSON.stringify({
             guardOn();
             let allowed = false;
             try { allowed = await isDownloadAllowedSilent(); } catch (e) { allowed = false; }
+            allowedCache = { key: allowedKey(), v: allowed };
             if (my !== guardSeq || !allowed) return;
             player.removeAttribute('controlsList');
             player.oncontextmenu = null;
