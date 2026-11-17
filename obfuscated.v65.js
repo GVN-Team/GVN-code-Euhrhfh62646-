@@ -3102,7 +3102,10 @@ window.__firebase_config = JSON.stringify({
                 last = now;
                 const W = layer.clientWidth, H = layer.clientHeight;
                 if (W > 0 && H > 0) {
-                    const fs = Math.max(10, Math.min(18, Math.round(W / 38)));
+                    // 見ている画面の大きさ(縦×横の平均)に比例して大きくする。動く速さも同じ割合で変える
+                    const size = Math.sqrt(W * H);
+                    const fs = Math.max(8, Math.round(size * 0.032));
+                    const scale = Math.max(0.6, size / 400);
                     marks.forEach(m => {
                         if (m.fs !== fs) { m.fs = fs; m.el.style.fontSize = fs + 'px'; m.w = m.el.offsetWidth; m.h = m.el.offsetHeight; }
                         if (now > m.turnAt) {
@@ -3110,7 +3113,7 @@ window.__firebase_config = JSON.stringify({
                             m.vx = Math.cos(a) * sp; m.vy = Math.sin(a) * sp;
                             m.turnAt = now + 4000 + Math.random() * 6000;
                         }
-                        m.x += m.vx * dt; m.y += m.vy * dt;
+                        m.x += m.vx * dt * scale; m.y += m.vy * dt * scale;
                         if (m.x < 0) { m.x = 0; m.vx = Math.abs(m.vx); } else if (m.x > W - m.w) { m.x = Math.max(0, W - m.w); m.vx = -Math.abs(m.vx); }
                         if (m.y < 0) { m.y = 0; m.vy = Math.abs(m.vy); } else if (m.y > H - m.h) { m.y = Math.max(0, H - m.h); m.vy = -Math.abs(m.vy); }
                         m.el.style.transform = 'translate(' + m.x.toFixed(1) + 'px,' + m.y.toFixed(1) + 'px) rotate(' + m.rot.toFixed(0) + 'deg)';
