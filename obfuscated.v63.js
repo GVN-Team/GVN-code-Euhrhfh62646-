@@ -2103,25 +2103,37 @@ window.__firebase_config = JSON.stringify({
             showToast("視聴履歴を消去しました", "historyClear");
         }
 
+        function myHeartReaction() {
+            const k = currentAccountKey();
+            return !!(k && socialReactions.some(r => r.accountKey === k && r.emoji === 'heart'));
+        }
+
         function toggleFavorite() {
             if (!currentUser) return;
-            const index = userFavorites.indexOf(activeId);
-            if (index >= 0) {
-                userFavorites.splice(index, 1);
-                showToast("お気に入りから削除しました", "watchLater");
-            } else {
-                userFavorites.push(activeId);
+            const hasFav = userFavorites.includes(activeId);
+            const hasHeart = myHeartReaction();
+            const turningOn = !(hasFav || hasHeart);
+            if (turningOn) {
+                if (!hasFav) userFavorites.push(activeId);
                 showToast("お気に入りに追加しました", "watchLater");
+            } else {
+                if (hasFav) userFavorites.splice(userFavorites.indexOf(activeId), 1);
+                showToast("お気に入りから削除しました", "watchLater");
             }
             setStoredData('favorites_' + currentUser, userFavorites);
             updateFavoriteBtnUI();
             renderPlaylist();
+            // ハートは「いいね」(❤️のリアクション)も兼ねる。数はすぐ変わり、Firebaseへの保存は後から行われる
+            if (currentAccountKey()) {
+                if (turningOn && !hasHeart) toggleReaction('heart');
+                else if (!turningOn && hasHeart) toggleReaction('heart');
+            }
         }
 
         function updateFavoriteBtnUI() {
             const btn = document.getElementById('favoriteBtn');
             if (!btn) return;
-            const on = userFavorites.includes(activeId);
+            const on = userFavorites.includes(activeId) || myHeartReaction();
             btn.innerHTML = `<i data-lucide="heart" class="w-5 h-5 text-rose-400 ${on ? 'fill-rose-400' : 'fill-transparent'}"></i>`;
             lucide.createIcons();
         }
@@ -2300,14 +2312,17 @@ window.__firebase_config = JSON.stringify({
             const index = userSaved.indexOf(activeId);
             const savedVid = activeId;
             if (index >= 0) userSaved.splice(index, 1); else userSaved.push(activeId);
+            const saveDelta = index >= 0 ? -1 : 1;
+            bumpStat(savedVid, 'saves', saveDelta);
             updateSaveBtnUI();
             renderPlaylist();
             try {
                 await pushSavedToCloud(userSaved);
-                trackEvent(index >= 0 ? 'unsave' : 'save', savedVid).then(r => { if (r && r.json && r.json.counted) bumpStat(savedVid, 'saves', index >= 0 ? -1 : 1); });
+                trackEvent(index >= 0 ? 'unsave' : 'save', savedVid).then(r => { if (!(r && r.json && r.json.counted)) bumpStat(savedVid, 'saves', -saveDelta); });
                 showToast(index >= 0 ? "「あとで見る」から削除しました" : "「あとで見る」に追加しました", "watchLater");
             } catch (e) {
                 userSaved = prev;
+                bumpStat(savedVid, 'saves', -saveDelta);
                 updateSaveBtnUI();
                 renderPlaylist();
                 showToast("「あとで見る」の更新に失敗しました (" + (e && e.message ? e.message : '通信エラー') + ")", "system");
@@ -2808,6 +2823,7 @@ window.__firebase_config = JSON.stringify({
         let commentSending = false;
         let lastCommentAt = 0;
         let replyTarget = null;
+        const expandedReplies = new Set();
         let statsMap = {};
         let statsLoadedAt = 0;
         let viewTimer = null;
@@ -2969,10 +2985,26 @@ window.__firebase_config = JSON.stringify({
                 wrap.appendChild(buildRow(c));
                 const rs = (repliesOf.get(c._id) || []).sort((x, y) => (x.createdAt || 0) - (y.createdAt || 0));
                 if (rs.length) {
-                    const box = document.createElement('div');
-                    box.className = 'ml-4 mt-1.5 pl-2 border-l border-brandBorder space-y-1.5';
-                    rs.forEach(r => box.appendChild(buildRow(r)));
-                    wrap.appendChild(box);
+                    const open = expandedReplies.has(c._id);
+                    const toggle = document.createElement('button');
+                    toggle.className = 'flex items-center gap-2 mt-1.5 ml-3 text-[11px] font-bold text-brandMuted hover:text-brandAccent transition-colors';
+                    const line = document.createElement('span');
+                    line.className = 'inline-block w-6 h-px bg-brandBorder';
+                    const label = document.createElement('span');
+                    label.textContent = open ? '返信を非表示' : '返信を表示(' + rs.length + '件)';
+                    toggle.appendChild(line);
+                    toggle.appendChild(label);
+                    toggle.onclick = () => {
+                        if (open) expandedReplies.delete(c._id); else expandedReplies.add(c._id);
+                        renderSocial();
+                    };
+                    wrap.appendChild(toggle);
+                    if (open) {
+                        const box = document.createElement('div');
+                        box.className = 'ml-4 mt-1.5 pl-2 border-l border-brandBorder space-y-1.5';
+                        rs.forEach(r => box.appendChild(buildRow(r)));
+                        wrap.appendChild(box);
+                    }
                 }
                 list.appendChild(wrap);
             });
@@ -2999,7 +3031,7 @@ window.__firebase_config = JSON.stringify({
             } catch (e) {
                 if (socialVideoId === videoId) setCommentStatus('コメントを読み込めませんでした (' + (e && e.message ? e.message : '通信エラー') + ')');
             }
-            if (socialVideoId === videoId) renderSocial();
+            if (socialVideoId === videoId) { renderSocial(); updateFavoriteBtnUI(); }
         }
 
         async function toggleReaction(key) {
@@ -3017,6 +3049,7 @@ window.__firebase_config = JSON.stringify({
             socialReactions = socialReactions.filter(r => r.accountKey !== accountKey);
             if (!removing) socialReactions.push({ accountKey: accountKey, emoji: key, siteId: window.APP_UNIQUE_ID, videoId: videoId });
             renderSocial();
+            updateFavoriteBtnUI();
             try {
                 const headers = await likesAuthHeaders();
                 const url = LIKES_DOCS + '/reactions/' + encodeURIComponent(docId);
@@ -3037,7 +3070,7 @@ window.__firebase_config = JSON.stringify({
                 }
                 if (!res.ok) throw new Error('HTTP ' + res.status);
             } catch (e) {
-                if (socialVideoId === videoId) { socialReactions = prev; renderSocial(); }
+                if (socialVideoId === videoId) { socialReactions = prev; renderSocial(); updateFavoriteBtnUI(); }
                 showToast("リアクションに失敗しました (" + (e && e.message ? e.message : '通信エラー') + ")", "system");
             }
         }
@@ -3123,8 +3156,11 @@ window.__firebase_config = JSON.stringify({
 
         async function trackEvent(kind, videoId) {
             const base = trackBase();
+            if (!base) return null;
             const cred = gateCredentials();
-            if (!base || !cred || !Number.isInteger(videoId)) return null;
+            if (!cred) { setTrackNote('ログインし直すと、再生・共有・保存の回数が記録されます'); return null; }
+            videoId = Number(videoId);
+            if (!Number.isInteger(videoId)) return null;
             try {
                 const res = await fetch(base + '/track', {
                     method: 'POST',
@@ -3132,8 +3168,16 @@ window.__firebase_config = JSON.stringify({
                     body: JSON.stringify(Object.assign({ siteId: window.APP_UNIQUE_ID, videoId: videoId, kind: kind, sid: trackSid }, cred)),
                     keepalive: true
                 });
-                return { status: res.status, json: await res.json().catch(() => ({})) };
-            } catch (e) { return null; }
+                const json = await res.json().catch(() => ({}));
+                if (kind !== 'heartbeat') {
+                    if (res.status >= 400 && res.status !== 429) setTrackNote('回数を記録できませんでした(' + (json.error || ('HTTP ' + res.status)) + ')');
+                    else if (res.ok) setTrackNote('');
+                }
+                return { status: res.status, json: json };
+            } catch (e) {
+                if (kind !== 'heartbeat') setTrackNote('回数を記録できませんでした(認証サーバーに接続できません)');
+                return null;
+            }
         }
 
         function bumpStat(videoId, field, d) {
@@ -3154,17 +3198,38 @@ window.__firebase_config = JSON.stringify({
             } catch (e) {}
         }
 
+        function fmtCount(n) {
+            n = Number(n) || 0;
+            if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+            if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+            return String(n);
+        }
+
+        function setTrackNote(msg) {
+            const n = document.getElementById('statsNote');
+            if (!n) return;
+            n.textContent = msg || '';
+            n.style.display = msg ? 'block' : 'none';
+        }
+
         function renderStatsLine() {
-            const el = document.getElementById('statsLine');
-            if (!el) return;
+            const box = document.getElementById('statsLine');
+            if (!box) return;
             const s = statsMap[String(activeId)] || {};
             const hasSrv = !!trackBase();
-            const parts = [];
-            if (hasSrv) parts.push('再生 ' + (s.views || 0));
-            parts.push('いいね ' + socialReactions.length);
-            if (hasSrv) { parts.push('保存 ' + (s.saves || 0)); parts.push('共有 ' + (s.shares || 0)); }
-            parts.push('コメント ' + socialComments.length);
-            el.textContent = parts.join(' ・ ');
+            const vals = {
+                views: s.views || 0,
+                likes: socialReactions.length + (s.likesBonus || 0),
+                comments: socialComments.length + (s.commentsBonus || 0),
+                saves: s.saves || 0,
+                shares: s.shares || 0
+            };
+            box.querySelectorAll('[data-stat]').forEach(cell => {
+                const k = cell.getAttribute('data-stat');
+                cell.style.display = (!hasSrv && (k === 'views' || k === 'saves' || k === 'shares')) ? 'none' : 'flex';
+                const num = cell.querySelector('.stat-num');
+                if (num) num.textContent = fmtCount(vals[k]);
+            });
         }
 
         function onVideoSelectedForStats(videoId) {
@@ -3192,10 +3257,38 @@ window.__firebase_config = JSON.stringify({
         function initStatsUi() {
             const h1 = document.getElementById('videoTitle');
             if (h1 && !document.getElementById('statsLine')) {
-                const p = document.createElement('p');
-                p.id = 'statsLine';
-                p.className = 'text-[11px] text-brandMuted font-mono mt-1.5';
-                h1.insertAdjacentElement('afterend', p);
+                const wrap = document.createElement('div');
+                const grid = document.createElement('div');
+                grid.id = 'statsLine';
+                grid.className = 'flex gap-1.5 mt-3';
+                [['views', 'eye', '再生'], ['likes', 'heart', 'いいね'], ['comments', 'message-circle', 'コメント'], ['saves', 'bookmark', '保存'], ['shares', 'share-2', '共有']].forEach(([key, icon, label]) => {
+                    const cell = document.createElement('div');
+                    cell.setAttribute('data-stat', key);
+                    cell.className = 'flex-1 min-w-0 flex-col items-center justify-center rounded-xl border border-brandBorder bg-brandBg py-2';
+                    cell.style.display = 'flex';
+                    const ic = document.createElement('i');
+                    ic.setAttribute('data-lucide', icon);
+                    ic.className = 'w-4 h-4 text-brandAccent';
+                    const num = document.createElement('span');
+                    num.className = 'stat-num text-sm font-black font-mono text-brandText mt-1 leading-none';
+                    num.textContent = '0';
+                    const lab = document.createElement('span');
+                    lab.className = 'text-[9px] text-brandMuted mt-1 leading-none';
+                    lab.textContent = label;
+                    cell.appendChild(ic);
+                    cell.appendChild(num);
+                    cell.appendChild(lab);
+                    grid.appendChild(cell);
+                });
+                const note = document.createElement('p');
+                note.id = 'statsNote';
+                note.className = 'text-[10px] text-amber-400 mt-1.5';
+                note.style.display = 'none';
+                wrap.appendChild(grid);
+                wrap.appendChild(note);
+                h1.insertAdjacentElement('afterend', wrap);
+                if (window.lucide) lucide.createIcons();
+                renderStatsLine();
             }
             loadStats();
             player.addEventListener('playing', () => { sendHeartbeat(); });
@@ -3260,6 +3353,7 @@ window.__firebase_config = JSON.stringify({
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const created = plainDoc(await res.json());
                 input.value = '';
+                if (replyTarget && replyTarget.id) expandedReplies.add(replyTarget.id);
                 replyTarget = null;
                 updateReplyBanner();
                 lastCommentAt = Date.now();
@@ -4822,12 +4916,12 @@ window.__firebase_config = JSON.stringify({
                     if (shareText) payload.text = shareText;
                     await navigator.share(payload);
                     showToast("共有メニューを開きました", 'share');
-                    if (cur) trackEvent('share', cur.id).then(r => { if (r && r.json && r.json.counted) bumpStat(cur.id, 'shares', 1); });
+                    if (cur) { bumpStat(cur.id, 'shares', 1); trackEvent('share', cur.id).then(r => { if (!(r && r.json && r.json.counted)) bumpStat(cur.id, 'shares', -1); }); }
                 } catch (error) {}
             } else {
                 const temp = document.createElement("input"); temp.value = finalShareUrl; document.body.appendChild(temp); temp.select(); document.execCommand("copy"); document.body.removeChild(temp);
                 showToast("リンクをコピーしました", 'share');
-                if (cur) trackEvent('share', cur.id).then(r => { if (r && r.json && r.json.counted) bumpStat(cur.id, 'shares', 1); });
+                if (cur) { bumpStat(cur.id, 'shares', 1); trackEvent('share', cur.id).then(r => { if (!(r && r.json && r.json.counted)) bumpStat(cur.id, 'shares', -1); }); }
             }
         }
 
