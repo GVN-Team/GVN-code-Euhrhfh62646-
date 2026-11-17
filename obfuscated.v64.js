@@ -3198,11 +3198,20 @@ window.__firebase_config = JSON.stringify({
             } catch (e) {}
         }
 
+        const COUNT_SUFFIXES = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc', 'Ud', 'Dd', 'Td', 'Qad', 'Qid', 'Sxd', 'Spd', 'Ocd', 'Nod', 'Vg', 'Uvg', 'Dvg', 'Tvg', 'Qavg', 'Qivg', 'Sxvg', 'Spvg', 'Ocvg', 'Novg', 'Tg', 'Utg', 'Dtg'];
+
+        // 1000倍ごとの単位(K, M, B, T, Qa … Dtg まで)で短く表す。Dtg(10の99乗)を超える数は 1.23e+102 の形
         function fmtCount(n) {
             n = Number(n) || 0;
-            if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-            if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
-            return String(n);
+            if (n < 1000) return String(Math.floor(n));
+            let idx = Math.floor(Math.log10(n) / 3);
+            if (idx >= COUNT_SUFFIXES.length) return n.toExponential(2);
+            let s = (n / Math.pow(10, idx * 3)).toFixed(2);
+            if (parseFloat(s) >= 1000 && idx + 1 < COUNT_SUFFIXES.length) {
+                idx++;
+                s = (n / Math.pow(10, idx * 3)).toFixed(2);
+            }
+            return s.replace(/\.?0+$/, '') + COUNT_SUFFIXES[idx];
         }
 
         function setTrackNote(msg) {
