@@ -1241,11 +1241,7 @@ window.__firebase_config = JSON.stringify({
                 const dateMatch = v.date.includes(searchQuery);
                 return titleMatch || descMatch || dateMatch;
             });
-            if (currentSortOrder === "oldest") {
-                filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
-            } else {
-                filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
-            }
+            filtered.sort(compareVideos);
             const idx = filtered.findIndex(v => v.id === activeId);
             if (idx === -1 || idx === filtered.length - 1) return null;
             return filtered[idx + 1].id;
@@ -1762,7 +1758,7 @@ window.__firebase_config = JSON.stringify({
                 const memberData = await guildMemberRes.json();
                 await setStep('ロールを確認しています');
                 const hasRole = memberData.roles && memberData.roles.some(role => String(role) === String(DISCORD_CONFIG["role-id"]));
-                        try { setStoredData('session_discord_roles', (memberData.roles || []).map(String)); } catch (e) {}
+                        try { setStoredData('session_discord_roles', (memberData.roles || []).map(String)); refilterVideos(); } catch (e) {}
 
                 if (hasRole) {
                     await setStep('ログイン情報を保存しています');
@@ -2823,6 +2819,7 @@ window.__firebase_config = JSON.stringify({
         let commentSending = false;
         let lastCommentAt = 0;
         let replyTarget = null;
+        let commentSort = 'new';
         const expandedReplies = new Set();
         let statsMap = {};
         let statsLoadedAt = 0;
@@ -2943,6 +2940,7 @@ window.__firebase_config = JSON.stringify({
                     repliesOf.get(c.parentId).push(c);
                 } else tops.push(c);
             });
+            const pinnedId = String((statsMap[String(socialVideoId)] || {}).pinned || '');
             const buildRow = (c) => {
                 const row = document.createElement('div');
                 row.className = 'bg-brandBg border border-brandBorder rounded-xl px-3 py-2.5';
@@ -2950,7 +2948,7 @@ window.__firebase_config = JSON.stringify({
                 head.className = 'flex items-center justify-between gap-2';
                 const who = document.createElement('span');
                 who.className = 'text-[11px] font-black text-brandText truncate';
-                who.textContent = c.name || '名無し';
+                who.textContent = (c._id === pinnedId ? '📌 ' : '') + (c.name || '名無し');
                 const right = document.createElement('span');
                 right.className = 'flex items-center gap-2 flex-shrink-0';
                 const when = document.createElement('span');
@@ -2980,6 +2978,14 @@ window.__firebase_config = JSON.stringify({
                 row.appendChild(text);
                 return row;
             };
+            const replyCount = (c) => (repliesOf.get(c._id) || []).length;
+            tops.sort((x, y) => {
+                if (x._id === pinnedId) return -1;
+                if (y._id === pinnedId) return 1;
+                if (commentSort === 'old') return (x.createdAt || 0) - (y.createdAt || 0);
+                if (commentSort === 'replies') return (replyCount(y) - replyCount(x)) || ((y.createdAt || 0) - (x.createdAt || 0));
+                return (y.createdAt || 0) - (x.createdAt || 0);
+            });
             tops.forEach(c => {
                 const wrap = document.createElement('div');
                 wrap.appendChild(buildRow(c));
@@ -3197,7 +3203,12 @@ window.__firebase_config = JSON.stringify({
             try {
                 const res = await fetch(base + '/stats?siteId=' + encodeURIComponent(window.APP_UNIQUE_ID));
                 const j = await res.json();
-                if (j && j.success) { statsMap = j.stats || {}; renderStatsLine(); }
+                if (j && j.success) {
+                    statsMap = j.stats || {};
+                    renderStatsLine();
+                    if (['views', 'saves', 'shares'].includes(currentSortOrder)) renderPlaylist();
+                    renderSocial();
+                }
             } catch (e) {}
         }
 
@@ -3246,6 +3257,10 @@ window.__firebase_config = JSON.stringify({
 
         function onVideoSelectedForStats(videoId) {
             clearTimeout(viewTimer);
+            if (rangeEnd && rangeEnd.id !== videoId) rangeEnd = null;
+            rangeStart = null;
+            rangeStop = null;
+            updateRangeUi();
             renderStatsLine();
             if (Date.now() - statsLoadedAt > 20000) loadStats();
             viewTimer = setTimeout(() => {
@@ -3302,9 +3317,198 @@ window.__firebase_config = JSON.stringify({
                 if (window.lucide) lucide.createIcons();
                 renderStatsLine();
             }
+            initCommentSortUi();
+            initRangeShareUi();
+            initErrorLogUi();
+            player.addEventListener('timeupdate', () => {
+                if (rangeEnd && rangeEnd.id === activeId && player.currentTime >= rangeEnd.e) {
+                    const e = rangeEnd.e;
+                    rangeEnd = null;
+                    player.pause();
+                    try { player.currentTime = Math.max(0, e - 0.05); } catch (err) {}
+                    showToast('共有された区間はここまでです', 'system');
+                }
+            });
             loadStats();
             player.addEventListener('playing', () => { sendHeartbeat(); });
             setInterval(sendHeartbeat, 30000);
+        }
+
+        // ---- コメントの並び替え ----
+        function initCommentSortUi() {
+            const list = document.getElementById('commentList');
+            if (!list || document.getElementById('commentSortSel')) return;
+            const wrap = document.createElement('div');
+            wrap.className = 'flex justify-end';
+            const sel = document.createElement('select');
+            sel.id = 'commentSortSel';
+            sel.className = 'text-[11px] bg-brandBg text-brandMuted border border-brandBorder rounded-lg px-2 py-1 outline-none';
+            [['new', '新しい順'], ['old', '古い順'], ['replies', '返信が多い順']].forEach(([k, label]) => {
+                const o = document.createElement('option');
+                o.value = k;
+                o.textContent = label;
+                sel.appendChild(o);
+            });
+            sel.onchange = () => { commentSort = sel.value; renderSocial(); };
+            wrap.appendChild(sel);
+            list.parentNode.insertBefore(wrap, list);
+        }
+
+        // ---- 区間を指定した共有リンク ----
+        function fmtClock(sec) {
+            sec = Math.max(0, Math.floor(sec));
+            const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+            return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s).padStart(2, '0');
+        }
+
+        function rangeLink() {
+            if (rangeStart === null || rangeStop === null || rangeStop <= rangeStart) return '';
+            const base = SHARE_CONFIG.url || (window.location.origin + window.location.pathname);
+            const u = new URL(base, window.location.href);
+            u.searchParams.set('v', activeId);
+            u.searchParams.set('t', rangeStart);
+            u.searchParams.set('e', rangeStop);
+            return u.toString();
+        }
+
+        function updateRangeUi() {
+            const info = document.getElementById('rangeInfo');
+            const box = document.getElementById('rangeBox');
+            const cur = videos.find(v => v.id === activeId);
+            if (box) box.style.display = (cur && cur.type !== 'image' && !cur.images) ? 'block' : 'none';
+            if (!info) return;
+            const a = rangeStart === null ? '--:--' : fmtClock(rangeStart);
+            const b = rangeStop === null ? '--:--' : fmtClock(rangeStop);
+            info.textContent = '開始 ' + a + ' → 終了 ' + b;
+            const inp = document.getElementById('rangeLinkInput');
+            if (inp) inp.value = rangeLink();
+        }
+
+        function initRangeShareUi() {
+            const anchor = document.getElementById('statsLine');
+            if (!anchor || document.getElementById('rangeBox')) return;
+            const det = document.createElement('details');
+            det.id = 'rangeBox';
+            det.className = 'mt-2 text-[11px] text-brandMuted';
+            const sum = document.createElement('summary');
+            sum.className = 'cursor-pointer font-bold py-1';
+            sum.textContent = '区間を指定して共有';
+            det.appendChild(sum);
+            const row = document.createElement('div');
+            row.className = 'flex gap-1.5 mt-1.5';
+            const mk = (label, fn) => {
+                const b = document.createElement('button');
+                b.className = 'tool-chip flex-1';
+                b.textContent = label;
+                b.onclick = fn;
+                row.appendChild(b);
+            };
+            mk('ここを開始', () => { rangeStart = Math.floor(player.currentTime || 0); if (rangeStop !== null && rangeStop <= rangeStart) rangeStop = null; updateRangeUi(); });
+            mk('ここを終了', () => { rangeStop = Math.floor(player.currentTime || 0); updateRangeUi(); });
+            det.appendChild(row);
+            const info = document.createElement('p');
+            info.id = 'rangeInfo';
+            info.className = 'mt-1.5 font-mono';
+            det.appendChild(info);
+            const inp = document.createElement('input');
+            inp.id = 'rangeLinkInput';
+            inp.readOnly = true;
+            inp.placeholder = '開始と終了を決めると、リンクが出ます';
+            inp.className = 'w-full mt-1.5 bg-brandBg border border-brandBorder rounded-lg px-2 py-1.5 text-[11px] text-brandText outline-none';
+            inp.onfocus = () => inp.select();
+            det.appendChild(inp);
+            const copy = document.createElement('button');
+            copy.className = 'tool-chip w-full mt-1.5';
+            copy.textContent = 'リンクをコピー';
+            copy.onclick = async () => {
+                const link = rangeLink();
+                if (!link) { showToast('開始と終了を決めてください(終了は開始より後)', 'system'); return; }
+                try { await navigator.clipboard.writeText(link); showToast('区間のリンクをコピーしました', 'share'); }
+                catch (e) { inp.focus(); inp.select(); showToast('リンクを選択しました。コピーしてください', 'share'); }
+                const cur = videos.find(v => v.id === activeId);
+                if (cur) { bumpStat(cur.id, 'shares', 1); trackEvent('share', cur.id).then(r => { if (!(r && r.json && r.json.counted)) bumpStat(cur.id, 'shares', -1); }); }
+            };
+            det.appendChild(copy);
+            anchor.parentNode.appendChild(det);
+            updateRangeUi();
+        }
+
+        // ---- 画面内のエラーログ(開発者コンソールが見られない端末向け) ----
+        const appLog = [];
+        function pushAppLog(kind, msg) {
+            try {
+                appLog.push({ t: Date.now(), kind: kind, msg: String(msg).slice(0, 400) });
+                if (appLog.length > 80) appLog.shift();
+            } catch (e) {}
+        }
+        (function installErrorLog() {
+            window.addEventListener('error', (e) => pushAppLog('エラー', (e.message || '') + (e.filename ? ' @' + String(e.filename).split('/').pop() + ':' + e.lineno : '')));
+            window.addEventListener('unhandledrejection', (e) => pushAppLog('未処理', (e.reason && (e.reason.message || e.reason)) || 'rejection'));
+            const origErr = console.error;
+            console.error = function () {
+                try {
+                    pushAppLog('console', Array.from(arguments).map(a => {
+                        if (a && a.message) return a.message;
+                        if (typeof a === 'object') { try { return JSON.stringify(a); } catch (e) { return '[object]'; } }
+                        return String(a);
+                    }).join(' '));
+                } catch (e) {}
+                return origErr.apply(console, arguments);
+            };
+            const origFetch = window.fetch;
+            window.fetch = function (input, init) {
+                const url = typeof input === 'string' ? input : (input && input.url) || '';
+                const short = url.split('?')[0].slice(0, 90);
+                return origFetch.apply(this, arguments).then((res) => {
+                    if (!res.ok && res.status !== 404) pushAppLog('通信', 'HTTP ' + res.status + ' ' + short);
+                    return res;
+                }, (err) => { pushAppLog('通信', '失敗 ' + short + ' (' + ((err && err.message) || err) + ')'); throw err; });
+            };
+        })();
+
+        function renderAppLog() {
+            const pre = document.getElementById('appLogView');
+            if (!pre) return;
+            if (!appLog.length) { pre.textContent = '(ログはありません)'; return; }
+            pre.textContent = appLog.slice().reverse().map((l) => {
+                const d = new Date(l.t);
+                return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':' + String(d.getSeconds()).padStart(2, '0') + ' [' + l.kind + '] ' + l.msg;
+            }).join('\n');
+        }
+
+        function initErrorLogUi() {
+            if (document.getElementById('appLogView')) return;
+            const modal = document.getElementById('settingsModal');
+            const h2 = modal && modal.querySelector('h2');
+            if (!h2) return;
+            const det = document.createElement('details');
+            det.className = 'mb-5 border border-brandBorder rounded-lg bg-brandBg px-3';
+            const sum = document.createElement('summary');
+            sum.className = 'cursor-pointer text-sm font-bold text-brandText py-2.5';
+            sum.textContent = 'ログ(不具合の調べ方)';
+            det.appendChild(sum);
+            const pre = document.createElement('pre');
+            pre.id = 'appLogView';
+            pre.className = 'text-[10px] leading-relaxed text-brandMuted whitespace-pre-wrap break-all max-h-48 overflow-y-auto select-text';
+            det.appendChild(pre);
+            const row = document.createElement('div');
+            row.className = 'flex gap-1.5 py-2.5';
+            const mk = (label, fn) => {
+                const b = document.createElement('button');
+                b.className = 'tool-chip flex-1';
+                b.textContent = label;
+                b.onclick = fn;
+                row.appendChild(b);
+            };
+            mk('更新', renderAppLog);
+            mk('コピー', async () => {
+                try { await navigator.clipboard.writeText(pre.textContent); showToast('ログをコピーしました', 'system'); }
+                catch (e) { showToast('コピーできませんでした', 'system'); }
+            });
+            mk('消去', () => { appLog.length = 0; renderAppLog(); });
+            det.appendChild(row);
+            det.addEventListener('toggle', () => { if (det.open) renderAppLog(); });
+            h2.insertAdjacentElement('afterend', det);
         }
 
         // ---- コメントへの返信 ----
@@ -3466,6 +3670,7 @@ window.__firebase_config = JSON.stringify({
             if (code === 'NO_CRED') return "一度ログアウトして、もう一度ログインしてください";
             if (code === 'download-denied') return "ダウンロード権限が不足しています";
             if (code === 'no-role') return "この動画を見る権限がありません";
+            if (code === 'role-restricted') return "この動画は、特定のロールの人だけが見られます";
             if (code === 'discord-unavailable') return "Discordの確認が混み合っています。少し待ってから、もう一度お試しください";
             if (code === 'unauthorized') return "ログインの有効期限が切れました。もう一度ログインしてください";
             if (code === 'NETWORK') return "認証サーバーに接続できませんでした";
@@ -3994,6 +4199,9 @@ window.__firebase_config = JSON.stringify({
 
         const PENDING_LINK_KEY = 'pending_link';
         let linkSeek = null;
+        let rangeEnd = null;
+        let rangeStart = null;
+        let rangeStop = null;
         let linkSeekTimer = null;
         let linkSeekToasted = false;
 
@@ -4003,7 +4211,8 @@ window.__firebase_config = JSON.stringify({
                 const v = parseInt(params.get('v'));
                 if (!Number.isInteger(v) || v <= 0) return;
                 const t = parseFloat(params.get('t'));
-                setStoredData(PENDING_LINK_KEY, { v: v, t: (isFinite(t) && t > 0) ? Math.floor(t) : 0, ts: Date.now() });
+                const e = parseFloat(params.get('e'));
+                setStoredData(PENDING_LINK_KEY, { v: v, t: (isFinite(t) && t > 0) ? Math.floor(t) : 0, e: (isFinite(e) && e > 0) ? Math.floor(e) : 0, ts: Date.now() });
             } catch (e) {}
         }
 
@@ -4166,6 +4375,24 @@ window.__firebase_config = JSON.stringify({
         // Firestoreの本物のデータが届くまでは空のまま。
         // config.jsのvideosDataは、Firebaseが使えない時だけの最終フォールバックとして扱う。
         let videos = [];
+        let rawVideos = [];
+
+        // 動画ごとの「見られるロール」。空なら全員。Discordのロールを持つ人だけが見られる
+        function canSeeVideo(v) {
+            const need = Array.isArray(v.roles) ? v.roles.map(String).filter(Boolean) : [];
+            if (!need.length) return true;
+            const isDiscord = !!(currentUserDiscordId || getStoredData('session_discord_id', ''));
+            // ユーザーネーム+パスワードでログインした人は、管理画面で「見せる」にした動画だけ見られる
+            if (!isDiscord) return !!v.rolesAllowPw;
+            const mine = getStoredData('session_discord_roles', []);
+            return Array.isArray(mine) && mine.some(r => need.includes(String(r)));
+        }
+        function setVideos(list) { rawVideos = list; videos = list.filter(canSeeVideo); }
+        function refilterVideos() {
+            if (!rawVideos.length) return;
+            videos = rawVideos.filter(canSeeVideo);
+            renderPlaylist();
+        }
 
         function getVideosCollectionRef() {
             if (!window.db || !window.firestoreFns) return null;
@@ -4222,7 +4449,7 @@ window.__firebase_config = JSON.stringify({
             try {
                 const docs = await loadVideosViaRest();
                 if (docs.length > 0 && videos.length === 0) {
-                    videos = docs;
+                    setVideos(docs);
                     renderPlaylist();
                 } else if (docs.length === 0 && videos.length === 0) {
                     showVideoLoadStatus('動画が見つかりませんでした(このサイトIDの動画が未登録の可能性があります)');
@@ -4250,7 +4477,7 @@ window.__firebase_config = JSON.stringify({
             ]);
             if (!readyOrTimeout || !window.db || !window.firestoreFns) {
                 if (typeof videosData !== 'undefined' && Array.isArray(videosData) && videosData.length > 0 && videos.length === 0) {
-                    videos = videosData.slice();
+                    setVideos(videosData.slice());
                     renderPlaylist();
                 }
                 fallbackLoadVideos();
@@ -4277,7 +4504,7 @@ window.__firebase_config = JSON.stringify({
                 const docs = [];
                 snap.forEach(d => docs.push({ ...d.data(), _docId: d.id }));
                 if (docs.length > 0) {
-                    videos = docs;
+                    setVideos(docs);
                     renderPlaylist();
                 }
             }, (err) => {
@@ -4368,10 +4595,12 @@ window.__firebase_config = JSON.stringify({
             if (pending) {
                 activeId = pending.v;
                 if (pending.t > 0) linkSeek = { id: pending.v, t: pending.t };
+                if (pending.e > 0 && pending.e > (pending.t || 0)) rangeEnd = { id: pending.v, e: pending.e };
                 try {
                     const u = new URL(window.location.href);
                     u.searchParams.set('v', pending.v);
                     u.searchParams.delete('t');
+                    u.searchParams.delete('e');
                     history.replaceState(null, '', u.toString());
                 } catch (e) {}
             }
@@ -4433,7 +4662,7 @@ window.__firebase_config = JSON.stringify({
 
                 const memberData = await guildMemberRes.json();
                 const hasRole = memberData.roles && memberData.roles.some(role => String(role) === String(DISCORD_CONFIG["role-id"]));
-                        try { setStoredData('session_discord_roles', (memberData.roles || []).map(String)); } catch (e) {}
+                        try { setStoredData('session_discord_roles', (memberData.roles || []).map(String)); refilterVideos(); } catch (e) {}
 
                 if (!hasRole) {
                     showRoleLostOverlay();
@@ -5183,9 +5412,24 @@ window.__firebase_config = JSON.stringify({
             renderPlaylist();
         }
 
+        // 並び順: 新しい順 / 古い順 / 再生・保存・共有が多い順(同数なら新しい順)
+        function compareVideos(a, b) {
+            if (currentSortOrder === "oldest") return new Date(a.date) - new Date(b.date);
+            if (currentSortOrder === "views" || currentSortOrder === "saves" || currentSortOrder === "shares") {
+                const k = currentSortOrder;
+                const da = (statsMap[String(a.id)] || {})[k] || 0;
+                const db = (statsMap[String(b.id)] || {})[k] || 0;
+                if (da !== db) return da < db ? 1 : -1;
+            }
+            return new Date(b.date) - new Date(a.date);
+        }
+
         const sortOptions = [
             { key: "newest", label: "新しい順" },
-            { key: "oldest", label: "古い順" }
+            { key: "oldest", label: "古い順" },
+            { key: "views", label: "再生が多い順" },
+            { key: "saves", label: "保存が多い順" },
+            { key: "shares", label: "共有が多い順" }
         ];
 
         function toggleSortDropdown(e) {
@@ -5246,11 +5490,7 @@ window.__firebase_config = JSON.stringify({
                 return titleMatch || descMatch || dateMatch;
             });
 
-            if (currentSortOrder === "oldest") {
-                filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
-            } else {
-                filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
-            }
+            filtered.sort(compareVideos);
             // ピン留めされた動画を先頭に(並び順は保つ)
             filtered = filtered.filter(v => v.pinned).concat(filtered.filter(v => !v.pinned));
 
