@@ -173,7 +173,7 @@ const APP_LAYOUT_HTML = String.raw`
                                     <i data-lucide="picture-in-picture-2" class="w-5 h-5"></i>
                                 </button>
                                 <button id="fullscreenBtn" class="p-2 text-white hover:text-brandAccent transition-colors min-w-[40px] min-h-[40px] flex items-center justify-center active:scale-90" title="全画面 (F)">
-                                    <i data-lucide="maximize" class="w-5 h-5"></i>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
                                 </button>
                             </div>
                         </div>
@@ -1780,6 +1780,254 @@ window.__firebase_config = JSON.stringify({
             }
         }
 
+        // ================= Face ID(パスキー)でのロック・ログイン =================
+        const PK_FLAG = 'pk_lock_on';      // この端末でFace IDのロックがONか(サイトごとに別のオリジンなので、接頭辞なし)
+        const PK_CRED = 'pk_lock_cred';    // 登録したパスキーのID
+        let pkAuthBusy = false;
+        let pkDisableArmed = 0;
+
+        const PK_LOCK_SVG = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>';
+
+        function pkLockOn() { try { return localStorage.getItem(PK_FLAG) === '1'; } catch (e) { return false; } }
+
+        function pkSupported() { return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create); }
+
+        function pkB64ToBuf(s) {
+            s = String(s || '').replace(/-/g, '+').replace(/_/g, '/');
+            while (s.length % 4) s += '=';
+            const bin = atob(s);
+            const out = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+            return out.buffer;
+        }
+
+        function pkBufToB64(buf) {
+            const bytes = new Uint8Array(buf);
+            let bin = '';
+            for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+            return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        }
+
+        async function pkPost(path, body) {
+            const base = trackBase();
+            if (!base) throw new Error('認証サーバーのURLが設定されていません');
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 60000);
+            try {
+                const res = await fetch(base + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctrl.signal });
+                const json = await res.json().catch(() => ({}));
+                if (!res.ok || !json.success) throw Object.assign(new Error(json.error || ('HTTP ' + res.status)), { status: res.status });
+                return json;
+            } finally { clearTimeout(timer); }
+        }
+
+        // ---- 認証画面(アプリを開いた瞬間・アプリを切り替えたときに表示) ----
+        function ensurePkOverlay() {
+            let o = document.getElementById('pkLock');
+            if (o) return o;
+            o = document.createElement('div');
+            o.id = 'pkLock';
+            o.setAttribute('style', 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:2147483647;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;visibility:visible;');
+            o.innerHTML = '<button id="pkLockBtn" type="button" style="display:flex;align-items:center;gap:10px;background:transparent;color:#2fe8c8;border:1px solid #2fe8c8;border-radius:16px;padding:16px 30px;font:700 16px \'IBM Plex Mono\',ui-monospace,monospace;box-shadow:0 0 18px rgba(47,232,200,.45);cursor:pointer;-webkit-tap-highlight-color:transparent;">' + PK_LOCK_SVG + '<span>認証する</span></button><p id="pkLockMsg" style="margin:0;min-height:16px;max-width:80%;text-align:center;color:#ff6b6b;font:12px ui-monospace,monospace;"></p>';
+            (document.body || document.documentElement).appendChild(o);
+            return o;
+        }
+
+        function bindPkOverlay() {
+            const btn = document.getElementById('pkLockBtn');
+            if (btn && !btn.dataset.bound) { btn.dataset.bound = '1'; btn.addEventListener('click', pkUnlock); }
+        }
+
+        function showPkLock() {
+            if (!pkLockOn()) return;
+            const o = ensurePkOverlay();
+            o.style.display = 'flex';
+            document.documentElement.classList.add('pk-lock');
+            bindPkOverlay();
+        }
+
+        function hidePkLock() {
+            const o = document.getElementById('pkLock');
+            if (o) o.style.display = 'none';
+            document.documentElement.classList.remove('pk-lock');
+        }
+
+        function setPkMsg(msg) { const m = document.getElementById('pkLockMsg'); if (m) m.textContent = msg || ''; }
+
+        function pkLockNow() { if (pkLockOn() && !pkAuthBusy) showPkLock(); }
+
+        // 認証に成功したあと: パスワードのアカウントなら、ログイン状態にする(別のアカウントや未ログインなら切り替えて再読み込み)
+        function applyPasskeyLogin(out) {
+            if (out.type === 'pw') {
+                const sameUser = getStoredData('session_user', '') === out.username && getStoredData('session_auth_token', '');
+                setStoredData('session_account_key', out.accountKey);
+                setStoredData('session_auth_token', out.token);
+                setStoredData('session_user', out.username);
+                setStoredData('session_avatar', '');
+                if (!sameUser) {
+                    setStoredData('session_discord_id', '');
+                    try { sessionStorage.setItem('pk_unlock_once', String(Date.now())); } catch (e) {}
+                    location.reload();
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        async function pkUnlock() {
+            if (pkAuthBusy) return;
+            const btn = document.getElementById('pkLockBtn');
+            pkAuthBusy = true;
+            setPkMsg('');
+            if (btn) btn.style.opacity = '0.5';
+            try {
+                if (!pkSupported()) throw new Error('この端末(ブラウザ)はパスキーに対応していません');
+                const credId = localStorage.getItem(PK_CRED) || '';
+                const opt = await pkPost('/passkey/auth-options', { siteId: window.APP_UNIQUE_ID, credIds: credId ? [credId] : [] });
+                const assertion = await navigator.credentials.get({ publicKey: {
+                    challenge: pkB64ToBuf(opt.challenge),
+                    allowCredentials: (opt.allowCredentials || []).map(id => ({ type: 'public-key', id: pkB64ToBuf(id) })),
+                    userVerification: 'required',
+                    timeout: 60000
+                } });
+                const r = assertion.response;
+                const out = await pkPost('/passkey/auth-verify', { siteId: window.APP_UNIQUE_ID, credential: {
+                    id: assertion.id,
+                    rawId: pkBufToB64(assertion.rawId),
+                    type: assertion.type,
+                    response: {
+                        clientDataJSON: pkBufToB64(r.clientDataJSON),
+                        authenticatorData: pkBufToB64(r.authenticatorData),
+                        signature: pkBufToB64(r.signature),
+                        userHandle: r.userHandle ? pkBufToB64(r.userHandle) : ''
+                    }
+                } });
+                if (out.type === 'dc' && !getStoredData('session_discord_id', '')) setPkMsg('');
+                if (applyPasskeyLogin(out)) return;
+                hidePkLock();
+            } catch (e) {
+                const name = e && e.name;
+                if (e && e.status === 404) {
+                    // サーバーにパスキーが無い(アカウント削除など)ときは、ロックを解除して閉じ込められないようにする
+                    try { localStorage.removeItem(PK_FLAG); localStorage.removeItem(PK_CRED); } catch (err) {}
+                    hidePkLock();
+                    updatePasskeyRow();
+                    return;
+                }
+                setPkMsg(name === 'NotAllowedError' ? '認証がキャンセルされました。もう一度押してください' : ('認証できませんでした(' + ((e && e.message) || name || 'error') + ')'));
+                pushAppLog('エラー', 'パスキー認証: ' + ((e && e.message) || name));
+            } finally {
+                pkAuthBusy = false;
+                if (btn) btn.style.opacity = '1';
+            }
+        }
+
+        // ---- 設定画面の「Face ID: ON/OFF」 ----
+        function updatePasskeyRow() {
+            const b = document.getElementById('pkSettingBtn');
+            if (!b) return;
+            if (!pkSupported()) { b.textContent = 'Face ID: 非対応'; b.disabled = true; return; }
+            b.disabled = false;
+            b.textContent = 'Face ID: ' + (pkLockOn() ? 'ON' : 'OFF');
+            b.classList.toggle('active', pkLockOn());
+        }
+
+        async function registerPasskey() {
+            const cred = gateCredentials();
+            if (!cred) { showToast('ログインしてから設定してください(古いログインの場合は、一度ログインし直してください)', 'system'); return; }
+            if (!pkSupported()) { showToast('この端末(ブラウザ)はパスキーに対応していません', 'system'); return; }
+            const accountKey = currentAccountKey();
+            if (!accountKey) { showToast('アカウントを確認できません。ログインし直してください', 'system'); return; }
+            pkAuthBusy = true;
+            try {
+                const opts = await pkPost('/passkey/register-options', Object.assign({ siteId: window.APP_UNIQUE_ID, accountKey }, cred));
+                const created = await navigator.credentials.create({ publicKey: {
+                    rp: { name: opts.rpName },
+                    user: { id: pkB64ToBuf(opts.user.id), name: opts.user.name, displayName: opts.user.displayName },
+                    challenge: pkB64ToBuf(opts.challenge),
+                    pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+                    authenticatorSelection: { authenticatorAttachment: 'platform', residentKey: 'required', requireResidentKey: true, userVerification: 'required' },
+                    attestation: 'none',
+                    excludeCredentials: (opts.excludeCredentials || []).map(id => ({ type: 'public-key', id: pkB64ToBuf(id) })),
+                    timeout: 60000
+                } });
+                const r = created.response;
+                await pkPost('/passkey/register-verify', Object.assign({ siteId: window.APP_UNIQUE_ID, accountKey, credential: {
+                    id: created.id,
+                    rawId: pkBufToB64(created.rawId),
+                    type: created.type,
+                    response: { clientDataJSON: pkBufToB64(r.clientDataJSON), attestationObject: pkBufToB64(r.attestationObject) }
+                } }, cred));
+                localStorage.setItem(PK_CRED, created.id);
+                localStorage.setItem(PK_FLAG, '1');
+                showToast('Face IDを設定しました。次にアプリを開いたときから認証が必要になります', 'system');
+            } catch (e) {
+                const name = e && e.name;
+                if (name === 'InvalidStateError') showToast('この端末には、すでにパスキーが登録されています', 'system');
+                else if (name === 'NotAllowedError') showToast('Face IDの設定がキャンセルされました', 'system');
+                else showToast('Face IDを設定できませんでした(' + ((e && e.message) || name || 'error') + ')', 'system');
+                pushAppLog('エラー', 'パスキー登録: ' + ((e && e.message) || name));
+            } finally {
+                pkAuthBusy = false;
+                updatePasskeyRow();
+            }
+        }
+
+        async function disablePasskey() {
+            const cred = gateCredentials();
+            const credId = localStorage.getItem(PK_CRED) || '';
+            try {
+                if (cred && credId) await pkPost('/passkey/remove', Object.assign({ siteId: window.APP_UNIQUE_ID, credId }, cred));
+                localStorage.removeItem(PK_FLAG);
+                localStorage.removeItem(PK_CRED);
+                showToast('Face IDをOFFにしました(端末のパスキーは、iPhoneの設定の「パスワード」から削除できます)', 'system');
+            } catch (e) {
+                showToast('Face IDをOFFにできませんでした(' + ((e && e.message) || 'error') + ')', 'system');
+            }
+            updatePasskeyRow();
+        }
+
+        function initPasskeyUi() {
+            if (document.getElementById('pkSettingBtn')) { updatePasskeyRow(); return; }
+            const modal = document.getElementById('settingsModal');
+            const h2 = modal && modal.querySelector('h2');
+            if (!h2) return;
+            const wrap = document.createElement('div');
+            wrap.className = 'mb-5';
+            const b = document.createElement('button');
+            b.id = 'pkSettingBtn';
+            b.type = 'button';
+            b.className = 'tool-chip w-full flex items-center justify-center gap-2';
+            b.onclick = () => {
+                if (pkLockOn()) {
+                    if (Date.now() - pkDisableArmed < 4000) { pkDisableArmed = 0; disablePasskey(); }
+                    else { pkDisableArmed = Date.now(); showToast('もう一度押すと、Face IDをOFFにします', 'system'); }
+                } else registerPasskey();
+            };
+            wrap.appendChild(b);
+            h2.insertAdjacentElement('afterend', wrap);
+            updatePasskeyRow();
+        }
+
+        function pkBoot() {
+            // Face ID直後の再読み込みでは、もう一度は認証を求めない
+            let skip = false;
+            try {
+                const t = Number(sessionStorage.getItem('pk_unlock_once') || 0);
+                sessionStorage.removeItem('pk_unlock_once');
+                skip = t && Date.now() - t < 15000;
+            } catch (e) {}
+            const css = document.createElement('style');
+            css.textContent = 'html.pk-lock body > *:not(#pkLock){visibility:hidden !important;} html.pk-lock{overflow:hidden;}';
+            document.head.appendChild(css);
+            if (skip) { hidePkLock(); } else if (pkLockOn()) { showPkLock(); }
+            // アプリを切り替える・閉じるときに、画面を隠す(アプリスイッチャーにも認証画面が出る)
+            document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') pkLockNow(); });
+            window.addEventListener('pagehide', pkLockNow);
+            window.addEventListener('pageshow', (e) => { if (e.persisted) pkLockNow(); });
+        }
+        if (document.body) pkBoot(); else document.addEventListener('DOMContentLoaded', pkBoot);
+
         function initApp() {
             updateMediaSession();
             capturePendingLink();
@@ -2237,7 +2485,7 @@ window.__firebase_config = JSON.stringify({
         async function fetchSavedFromCloud() {
             const id = savesDocId();
             if (!id) return null;
-            const res = await savesFetch(SAVES_BASE + '/' + encodeURIComponent(id) + '?key=' + SAVES_API_KEY);
+            const res = await savesFetch(SAVES_BASE + '/' + encodeURIComponent(id) + '?key=' + SAVES_API_KEY, { headers: await likesAuthHeaders() });
             if (res.status === 404) return [];
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const json = await res.json();
@@ -2256,7 +2504,7 @@ window.__firebase_config = JSON.stringify({
             };
             const res = await savesFetch(
                 SAVES_BASE + '/' + encodeURIComponent(id) + '?updateMask.fieldPaths=saved&updateMask.fieldPaths=updatedAt&key=' + SAVES_API_KEY,
-                { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+                { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, await likesAuthHeaders()), body: JSON.stringify(body) }
             );
             if (!res.ok) throw new Error('HTTP ' + res.status);
         }
@@ -2826,26 +3074,66 @@ window.__firebase_config = JSON.stringify({
         let viewTimer = null;
         const trackSid = Math.random().toString(36).slice(2) + Date.now().toString(36);
 
+        let likesAuthFor = '';
+        let likesName = '';
+
+        async function fetchLikesToken() {
+            const base = trackBase();
+            const cred = gateCredentials();
+            if (!base || !cred) return null;
+            const res = await fetch(base + '/likes-token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(Object.assign({ siteId: window.APP_UNIQUE_ID, accountKey: currentAccountKey() }, cred))
+            });
+            if (!res.ok) { const j = await res.json().catch(() => ({})); throw Object.assign(new Error(j.error || ('HTTP ' + res.status)), { status: res.status }); }
+            return await res.json();
+        }
+
+        // 本人の券でFirebaseにログインする(アカウントが変わったら、ログインし直す)
         function getLikesAuth() {
-            if (likesAuthPromise) return likesAuthPromise;
+            const want = currentAccountKey();
+            if (likesAuthPromise && likesAuthFor === want) return likesAuthPromise;
+            likesAuthFor = want;
             likesAuthPromise = (async () => {
-                const { initializeApp } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js');
-                const { getAuth, signInAnonymously, onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js');
-                const app = initializeApp(LIKES_FIREBASE_CONFIG, 'likes');
-                const auth = getAuth(app);
-                await new Promise((resolve, reject) => {
-                    const timer = setTimeout(() => reject(new Error('認証がタイムアウトしました')), 12000);
-                    onAuthStateChanged(auth, (u) => { if (u) { clearTimeout(timer); resolve(u); } });
-                    signInAnonymously(auth).catch((err) => { clearTimeout(timer); reject(err); });
-                });
+                const appMod = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js');
+                const authMod = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js');
+                const app = appMod.getApps().find(a => a.name === 'likes') || appMod.initializeApp(LIKES_FIREBASE_CONFIG, 'likes');
+                const auth = authMod.getAuth(app);
+                if (auth.currentUser && want && auth.currentUser.uid === want) { likesUid = want; return auth; }
+                if (auth.currentUser) { try { await authMod.signOut(auth); } catch (e) {} }
+                likesUid = '';
+                likesName = '';
+                if (!want) return auth; // ログインしていない間は、読み取りだけ(コメント・リアクションの表示)
+                let signed = false;
+                try {
+                    const t = await fetchLikesToken();
+                    if (t && t.token) {
+                        await authMod.signInWithCustomToken(auth, t.token);
+                        likesName = t.name || '';
+                        signed = true;
+                    }
+                } catch (e) {
+                    pushAppLog('通信', 'ログイン券を取得できませんでした(' + ((e && e.message) || e) + ')');
+                    if (e && e.status && e.status !== 501 && e.status !== 404) throw e;
+                }
+                if (!signed) {
+                    // サーバー側の設定が済んでいない間だけ、従来の匿名ログインを使う
+                    await new Promise((resolve, reject) => {
+                        const timer = setTimeout(() => reject(new Error('認証がタイムアウトしました')), 12000);
+                        authMod.onAuthStateChanged(auth, (u) => { if (u) { clearTimeout(timer); resolve(u); } });
+                        authMod.signInAnonymously(auth).catch((err) => { clearTimeout(timer); reject(err); });
+                    });
+                }
                 likesUid = auth.currentUser.uid;
                 return auth;
-            })().catch((e) => { likesAuthPromise = null; throw e; });
+            })().catch((e) => { likesAuthPromise = null; likesAuthFor = ''; throw e; });
             return likesAuthPromise;
         }
 
         async function likesAuthHeaders() {
             const auth = await getLikesAuth();
+            if (!auth.currentUser) throw new Error('ログインが必要です');
             const token = await auth.currentUser.getIdToken();
             return { Authorization: 'Bearer ' + token };
         }
@@ -3320,6 +3608,7 @@ window.__firebase_config = JSON.stringify({
             initCommentSortUi();
             initRangeShareUi();
             initErrorLogUi();
+            initPasskeyUi();
             player.addEventListener('timeupdate', () => {
                 if (rangeEnd && rangeEnd.id === activeId && player.currentTime >= rangeEnd.e) {
                     const e = rangeEnd.e;
@@ -3559,7 +3848,7 @@ window.__firebase_config = JSON.stringify({
                 const body = { fields: {
                     siteId: { stringValue: window.APP_UNIQUE_ID },
                     videoId: { integerValue: String(videoId) },
-                    name: { stringValue: String(currentUser).slice(0, 40) },
+                    name: { stringValue: String(likesName || currentUser).slice(0, 40) },
                     text: { stringValue: text.slice(0, 300) },
                     uid: { stringValue: likesUid },
                     createdAt: { integerValue: String(Date.now()) }
@@ -3918,7 +4207,7 @@ window.__firebase_config = JSON.stringify({
         async function fetchSyncDoc() {
             const id = syncDocId();
             if (!id) return null;
-            const res = await savesFetch(SYNC_BASE + '/' + encodeURIComponent(id) + '?key=' + SAVES_API_KEY);
+            const res = await savesFetch(SYNC_BASE + '/' + encodeURIComponent(id) + '?key=' + SAVES_API_KEY, { headers: await likesAuthHeaders() });
             if (res.status === 404) return null;
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const json = await res.json();
@@ -3936,7 +4225,7 @@ window.__firebase_config = JSON.stringify({
             } };
             const res = await savesFetch(
                 SYNC_BASE + '/' + encodeURIComponent(id) + '?updateMask.fieldPaths=data&updateMask.fieldPaths=updatedAt&key=' + SAVES_API_KEY,
-                { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), keepalive: !!keepalive }
+                { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, await likesAuthHeaders()), body: JSON.stringify(body), keepalive: !!keepalive }
             );
             if (!res.ok) throw new Error('HTTP ' + res.status);
         }
@@ -4315,6 +4604,7 @@ window.__firebase_config = JSON.stringify({
         }
 
         function openSettings() {
+            updatePasskeyRow();
             const modal = document.getElementById('settingsModal');
             const wrapper = document.getElementById('settingsModalScaleWrapper');
             populateSettingsInputs();
@@ -5828,6 +6118,20 @@ window.__firebase_config = JSON.stringify({
         }
         window.addEventListener('orientationchange', () => setTimeout(syncPseudoFsBox, 300));
 
+        // iPhoneの横向きでは、既定だと画面の左右(ノッチ側)と下(ホームバー)が黒い余白になる。
+        // 全画面の間だけ viewport-fit=cover にして、画面いっぱいまで使う(操作ボタンは安全な領域の内側に置く)
+        function setViewportCover(on) {
+            const m = document.querySelector('meta[name="viewport"]');
+            if (!m) return;
+            if (on) {
+                if (m.dataset.orig === undefined) m.dataset.orig = m.getAttribute('content') || '';
+                if (!/viewport-fit/.test(m.dataset.orig)) m.setAttribute('content', m.dataset.orig + (m.dataset.orig ? ', ' : '') + 'viewport-fit=cover');
+            } else if (m.dataset.orig !== undefined) {
+                m.setAttribute('content', m.dataset.orig);
+                delete m.dataset.orig;
+            }
+        }
+
         function setPseudoFullscreen(on) {
             const c = document.getElementById('videoContainer');
             if (!c) return;
@@ -5841,8 +6145,9 @@ window.__firebase_config = JSON.stringify({
                 c.classList.remove('pseudo-fs');
                 unlockBodyScroll();
             }
+            setViewportCover(on);
             syncPseudoFsBox();
-            if (on) setTimeout(syncPseudoFsBox, 300);
+            if (on) [100, 400, 900].forEach(ms => setTimeout(syncPseudoFsBox, ms));
             updateFullscreenUI();
         }
 
@@ -5850,7 +6155,7 @@ window.__firebase_config = JSON.stringify({
             const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || isPseudoFullscreen());
             const fsBtn = document.getElementById('fullscreenBtn');
             if (fsBtn) {
-                fsBtn.innerHTML = `<i data-lucide="${isFs ? 'minimize' : 'maximize'}" class="w-5 h-5 ${isFs ? 'text-brandAccent' : ''}"></i>`;
+                fsBtn.innerHTML = isFs ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-brandAccent"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>' : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>';
                 fsBtn.title = isFs ? '全画面を解除 (F)' : '全画面 (F)';
             }
             const fsBox = document.getElementById('videoContainer');
