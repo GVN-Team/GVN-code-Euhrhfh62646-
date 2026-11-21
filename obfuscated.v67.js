@@ -1189,6 +1189,7 @@ window.__firebase_config = JSON.stringify({
         function applyAccentColor(hex) {
             const root = document.documentElement;
             root.style.setProperty('--accent', hex);
+            try { localStorage.setItem('pk_accent', hex); } catch (e) {}
             root.style.setProperty('--accent-hover', darkenHexColor(hex, 15));
             root.style.setProperty('--shadow-color', hex);
         }
@@ -1788,6 +1789,26 @@ window.__firebase_config = JSON.stringify({
 
         const PK_LOCK_SVG = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>';
 
+        // SETTINGで設定されている色(アクセントカラー)。未設定なら、前回の色、なければ標準のオレンジ
+        function pkAccentHex() {
+            let h = '';
+            try { h = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(); } catch (e) {}
+            if (!/^#[0-9a-f]{6}$/i.test(h)) { try { h = localStorage.getItem('pk_accent') || ''; } catch (e) {} }
+            return /^#[0-9a-f]{6}$/i.test(h) ? h : '#ea580c';
+        }
+        function pkRgba(hex, a) {
+            const n = parseInt(hex.slice(1), 16);
+            return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')';
+        }
+        function stylePkOverlay() {
+            const b = document.getElementById('pkLockBtn');
+            if (!b) return;
+            const c = pkAccentHex();
+            b.style.color = c;
+            b.style.borderColor = c;
+            b.style.boxShadow = '0 0 18px ' + pkRgba(c, 0.45);
+        }
+
         function pkLockOn() { try { return localStorage.getItem(PK_FLAG) === '1'; } catch (e) { return false; } }
 
         function pkSupported() { return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create); }
@@ -1828,7 +1849,7 @@ window.__firebase_config = JSON.stringify({
             o = document.createElement('div');
             o.id = 'pkLock';
             o.setAttribute('style', 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:2147483647;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;visibility:visible;');
-            o.innerHTML = '<button id="pkLockBtn" type="button" style="display:flex;align-items:center;gap:10px;background:transparent;color:#2fe8c8;border:1px solid #2fe8c8;border-radius:16px;padding:16px 30px;font:700 16px \'IBM Plex Mono\',ui-monospace,monospace;box-shadow:0 0 18px rgba(47,232,200,.45);cursor:pointer;-webkit-tap-highlight-color:transparent;">' + PK_LOCK_SVG + '<span>認証する</span></button><p id="pkLockMsg" style="margin:0;min-height:16px;max-width:80%;text-align:center;color:#ff6b6b;font:12px ui-monospace,monospace;"></p>';
+            o.innerHTML = '<button id="pkLockBtn" type="button" style="display:flex;align-items:center;gap:10px;background:transparent;color:#ea580c;border:1px solid currentColor;border-radius:16px;padding:16px 30px;font:700 16px \'IBM Plex Mono\',ui-monospace,monospace;cursor:pointer;-webkit-tap-highlight-color:transparent;">' + PK_LOCK_SVG + '<span>認証する</span></button><p id="pkLockMsg" style="margin:0;min-height:16px;max-width:80%;text-align:center;color:#ff6b6b;font:12px ui-monospace,monospace;"></p>';
             (document.body || document.documentElement).appendChild(o);
             return o;
         }
@@ -1844,6 +1865,8 @@ window.__firebase_config = JSON.stringify({
             o.style.display = 'flex';
             document.documentElement.classList.add('pk-lock');
             bindPkOverlay();
+            stylePkOverlay();
+            prefetchAuthOptions();
         }
 
         function hidePkLock() {
@@ -1854,7 +1877,8 @@ window.__firebase_config = JSON.stringify({
 
         function setPkMsg(msg) { const m = document.getElementById('pkLockMsg'); if (m) m.textContent = msg || ''; }
 
-        function pkLockNow() { if (pkLockOn() && !pkAuthBusy) showPkLock(); }
+        let pkIgnoreUntil = 0;
+        function pkLockNow() { if (pkLockOn() && !pkAuthBusy && Date.now() >= pkIgnoreUntil) showPkLock(); }
 
         // 認証に成功したあと: パスワードのアカウントなら、ログイン状態にする(別のアカウントや未ログインなら切り替えて再読み込み)
         function applyPasskeyLogin(out) {
@@ -1874,35 +1898,75 @@ window.__firebase_config = JSON.stringify({
             return false;
         }
 
+        // 認証の準備(サーバーから受け取る一回きりの確認コード)を先に済ませておく。
+        // iPhoneは、ボタンを押した直後でないとFace IDの画面を出せないので、押す前に通信を終えておく
+        let pkAuthOpts = null;
+        let pkRegOpts = null;
+        const PK_OPTS_FRESH_MS = 240000;
+        const pkFresh = (o) => !!(o && Date.now() - o.t < PK_OPTS_FRESH_MS);
+
+        async function prefetchAuthOptions() {
+            if (!pkLockOn() || pkFresh(pkAuthOpts) || pkAuthOpts === 'loading') return;
+            pkAuthOpts = 'loading';
+            try {
+                const credId = localStorage.getItem(PK_CRED) || '';
+                const data = await pkPost('/passkey/auth-options', { siteId: window.APP_UNIQUE_ID, credIds: credId ? [credId] : [] });
+                pkAuthOpts = { t: Date.now(), data };
+            } catch (e) { pkAuthOpts = null; }
+        }
+
+        async function prefetchPasskeyOptions() {
+            if (pkLockOn() || !pkSupported() || pkFresh(pkRegOpts) || pkRegOpts === 'loading') return;
+            const cred = gateCredentials();
+            const accountKey = currentAccountKey();
+            if (!cred || !accountKey) return;
+            pkRegOpts = 'loading';
+            try {
+                const data = await pkPost('/passkey/register-options', Object.assign({ siteId: window.APP_UNIQUE_ID, accountKey }, cred));
+                pkRegOpts = { t: Date.now(), data };
+            } catch (e) { pkRegOpts = null; }
+        }
+
+        function pkSerializeAssertion(assertion) {
+            const r = assertion.response;
+            return {
+                id: assertion.id,
+                rawId: pkBufToB64(assertion.rawId),
+                type: assertion.type,
+                response: {
+                    clientDataJSON: pkBufToB64(r.clientDataJSON),
+                    authenticatorData: pkBufToB64(r.authenticatorData),
+                    signature: pkBufToB64(r.signature),
+                    userHandle: r.userHandle ? pkBufToB64(r.userHandle) : ''
+                }
+            };
+        }
+
         async function pkUnlock() {
             if (pkAuthBusy) return;
             const btn = document.getElementById('pkLockBtn');
+            if (!pkSupported()) { setPkMsg('この端末(ブラウザ)はパスキーに対応していません'); return; }
+            // 準備済みの確認コードがあれば、通信を待たずに、すぐFace IDの画面を出す
+            const ready = pkFresh(pkAuthOpts) ? pkAuthOpts.data : null;
+            if (!ready) {
+                setPkMsg('準備しています…');
+                await prefetchAuthOptions();
+                if (pkFresh(pkAuthOpts)) setPkMsg('準備できました。もう一度押してください');
+                else setPkMsg('認証サーバーに接続できません。しばらくしてから、もう一度押してください');
+                return;
+            }
+            pkAuthOpts = null;
             pkAuthBusy = true;
             setPkMsg('');
             if (btn) btn.style.opacity = '0.5';
             try {
-                if (!pkSupported()) throw new Error('この端末(ブラウザ)はパスキーに対応していません');
-                const credId = localStorage.getItem(PK_CRED) || '';
-                const opt = await pkPost('/passkey/auth-options', { siteId: window.APP_UNIQUE_ID, credIds: credId ? [credId] : [] });
                 const assertion = await navigator.credentials.get({ publicKey: {
-                    challenge: pkB64ToBuf(opt.challenge),
-                    allowCredentials: (opt.allowCredentials || []).map(id => ({ type: 'public-key', id: pkB64ToBuf(id) })),
+                    challenge: pkB64ToBuf(ready.challenge),
+                    allowCredentials: (ready.allowCredentials || []).map(id => ({ type: 'public-key', id: pkB64ToBuf(id) })),
                     userVerification: 'required',
                     timeout: 60000
                 } });
-                const r = assertion.response;
-                const out = await pkPost('/passkey/auth-verify', { siteId: window.APP_UNIQUE_ID, credential: {
-                    id: assertion.id,
-                    rawId: pkBufToB64(assertion.rawId),
-                    type: assertion.type,
-                    response: {
-                        clientDataJSON: pkBufToB64(r.clientDataJSON),
-                        authenticatorData: pkBufToB64(r.authenticatorData),
-                        signature: pkBufToB64(r.signature),
-                        userHandle: r.userHandle ? pkBufToB64(r.userHandle) : ''
-                    }
-                } });
-                if (out.type === 'dc' && !getStoredData('session_discord_id', '')) setPkMsg('');
+                const out = await pkPost('/passkey/auth-verify', { siteId: window.APP_UNIQUE_ID, credential: pkSerializeAssertion(assertion) });
                 if (applyPasskeyLogin(out)) return;
                 hidePkLock();
             } catch (e) {
@@ -1916,7 +1980,9 @@ window.__firebase_config = JSON.stringify({
                 }
                 setPkMsg(name === 'NotAllowedError' ? '認証がキャンセルされました。もう一度押してください' : ('認証できませんでした(' + ((e && e.message) || name || 'error') + ')'));
                 pushAppLog('エラー', 'パスキー認証: ' + ((e && e.message) || name));
+                prefetchAuthOptions();
             } finally {
+                pkIgnoreUntil = Date.now() + 1500;
                 pkAuthBusy = false;
                 if (btn) btn.style.opacity = '1';
             }
@@ -1930,47 +1996,60 @@ window.__firebase_config = JSON.stringify({
             b.disabled = false;
             b.textContent = 'Face ID: ' + (pkLockOn() ? 'ON' : 'OFF');
             b.classList.toggle('active', pkLockOn());
+            prefetchPasskeyOptions();
         }
 
-        async function registerPasskey() {
+        function registerPasskey() {
             const cred = gateCredentials();
             if (!cred) { showToast('ログインしてから設定してください(古いログインの場合は、一度ログインし直してください)', 'system'); return; }
             if (!pkSupported()) { showToast('この端末(ブラウザ)はパスキーに対応していません', 'system'); return; }
             const accountKey = currentAccountKey();
             if (!accountKey) { showToast('アカウントを確認できません。ログインし直してください', 'system'); return; }
-            pkAuthBusy = true;
-            try {
-                const opts = await pkPost('/passkey/register-options', Object.assign({ siteId: window.APP_UNIQUE_ID, accountKey }, cred));
-                const created = await navigator.credentials.create({ publicKey: {
-                    rp: { name: opts.rpName },
-                    user: { id: pkB64ToBuf(opts.user.id), name: opts.user.name, displayName: opts.user.displayName },
-                    challenge: pkB64ToBuf(opts.challenge),
-                    pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
-                    authenticatorSelection: { authenticatorAttachment: 'platform', residentKey: 'required', requireResidentKey: true, userVerification: 'required' },
-                    attestation: 'none',
-                    excludeCredentials: (opts.excludeCredentials || []).map(id => ({ type: 'public-key', id: pkB64ToBuf(id) })),
-                    timeout: 60000
-                } });
-                const r = created.response;
-                await pkPost('/passkey/register-verify', Object.assign({ siteId: window.APP_UNIQUE_ID, accountKey, credential: {
-                    id: created.id,
-                    rawId: pkBufToB64(created.rawId),
-                    type: created.type,
-                    response: { clientDataJSON: pkBufToB64(r.clientDataJSON), attestationObject: pkBufToB64(r.attestationObject) }
-                } }, cred));
-                localStorage.setItem(PK_CRED, created.id);
-                localStorage.setItem(PK_FLAG, '1');
-                showToast('Face IDを設定しました。次にアプリを開いたときから認証が必要になります', 'system');
-            } catch (e) {
-                const name = e && e.name;
-                if (name === 'InvalidStateError') showToast('この端末には、すでにパスキーが登録されています', 'system');
-                else if (name === 'NotAllowedError') showToast('Face IDの設定がキャンセルされました', 'system');
-                else showToast('Face IDを設定できませんでした(' + ((e && e.message) || name || 'error') + ')', 'system');
-                pushAppLog('エラー', 'パスキー登録: ' + ((e && e.message) || name));
-            } finally {
-                pkAuthBusy = false;
-                updatePasskeyRow();
+            const opts = pkFresh(pkRegOpts) ? pkRegOpts.data : null;
+            if (!opts) {
+                // 準備がまだのときだけ、準備を待つ(準備済みなら、下で、押した瞬間にFace IDの画面を出す)
+                showToast('準備しています…少しお待ちください', 'system');
+                prefetchPasskeyOptions().then(() => { showToast(pkFresh(pkRegOpts) ? '準備できました。もう一度押してください' : '認証サーバーに接続できませんでした', 'system'); });
+                return;
             }
+            pkRegOpts = null;
+            pkAuthBusy = true;
+            // ここでは、通信を待たずに、すぐパスキーの追加画面を出す
+            const createPromise = navigator.credentials.create({ publicKey: {
+                rp: { name: opts.rpName },
+                user: { id: pkB64ToBuf(opts.user.id), name: opts.user.name, displayName: opts.user.displayName },
+                challenge: pkB64ToBuf(opts.challenge),
+                pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+                authenticatorSelection: { authenticatorAttachment: 'platform', residentKey: 'required', requireResidentKey: true, userVerification: 'required' },
+                attestation: 'none',
+                excludeCredentials: (opts.excludeCredentials || []).map(id => ({ type: 'public-key', id: pkB64ToBuf(id) })),
+                timeout: 60000
+            } });
+            (async () => {
+                try {
+                    const created = await createPromise;
+                    const r = created.response;
+                    await pkPost('/passkey/register-verify', Object.assign({ siteId: window.APP_UNIQUE_ID, accountKey, credential: {
+                        id: created.id,
+                        rawId: pkBufToB64(created.rawId),
+                        type: created.type,
+                        response: { clientDataJSON: pkBufToB64(r.clientDataJSON), attestationObject: pkBufToB64(r.attestationObject) }
+                    } }, cred));
+                    localStorage.setItem(PK_CRED, created.id);
+                    localStorage.setItem(PK_FLAG, '1');
+                    showToast('Face IDを設定しました。アプリを閉じると、次に開いたときから認証が必要になります', 'system');
+                } catch (e) {
+                    const name = e && e.name;
+                    if (name === 'InvalidStateError') showToast('この端末には、すでにパスキーが登録されています', 'system');
+                    else if (name === 'NotAllowedError') showToast('Face IDの設定がキャンセルされました', 'system');
+                    else showToast('Face IDを設定できませんでした(' + ((e && e.message) || name || 'error') + ')', 'system');
+                    pushAppLog('エラー', 'パスキー登録: ' + ((e && e.message) || name));
+                } finally {
+                    pkIgnoreUntil = Date.now() + 1500;
+                    pkAuthBusy = false;
+                    updatePasskeyRow();
+                }
+            })();
         }
 
         async function disablePasskey() {
@@ -2020,12 +2099,32 @@ window.__firebase_config = JSON.stringify({
             const css = document.createElement('style');
             css.textContent = 'html.pk-lock body > *:not(#pkLock){visibility:hidden !important;} html.pk-lock{overflow:hidden;}';
             document.head.appendChild(css);
+            // 認証画面を、先に作っておく(アプリを閉じた瞬間に、すぐ出せるように)
+            if (pkLockOn()) { const o = ensurePkOverlay(); bindPkOverlay(); stylePkOverlay(); if (!skip) o.style.display = 'none'; }
             if (skip) { hidePkLock(); } else if (pkLockOn()) { showPkLock(); }
-            // アプリを切り替える・閉じるときに、画面を隠す(アプリスイッチャーにも認証画面が出る)
-            document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') pkLockNow(); });
+
+            // アプリを閉じた・切り替えたことを、いくつもの方法で検知して、すぐに認証画面を出す
+            //  1) 画面が見えなくなった(visibilitychange / pagehide / blur / freeze)
+            //  2) 動きが止まっていた(アプリが一時停止され、時計が飛んだ)
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'hidden') pkLockNow();
+                else if (pkLockOn()) { showPkLock(); prefetchAuthOptions(); }
+            });
             window.addEventListener('pagehide', pkLockNow);
-            window.addEventListener('pageshow', (e) => { if (e.persisted) pkLockNow(); });
+            window.addEventListener('blur', pkLockNow);
+            window.addEventListener('freeze', pkLockNow);
+            document.addEventListener('freeze', pkLockNow);
+            window.addEventListener('pageshow', (e) => { if (e.persisted) { pkLockNow(); prefetchAuthOptions(); } });
+            let pkTick = Date.now();
+            setInterval(() => {
+                const now = Date.now();
+                if (pkLockOn() && now - pkTick > 4000) pkLockNow();
+                pkTick = now;
+            }, 1000);
+            // 認証の準備コードは、5分で期限が切れるので、認証画面が出ている間は更新しておく
+            setInterval(() => { if (pkLockOn() && document.getElementById('pkLock') && document.getElementById('pkLock').style.display !== 'none') prefetchAuthOptions(); }, 60000);
         }
+
         if (document.body) pkBoot(); else document.addEventListener('DOMContentLoaded', pkBoot);
 
         function initApp() {
@@ -3609,6 +3708,8 @@ window.__firebase_config = JSON.stringify({
             initRangeShareUi();
             initErrorLogUi();
             initPasskeyUi();
+            setTimeout(deviceCheck, 4000);
+            setInterval(() => { if (rawVideos.some(v => Number(v.publishAt) > 0 && videos.indexOf(v) < 0)) refilterVideos(); }, 60000);
             player.addEventListener('timeupdate', () => {
                 if (rangeEnd && rangeEnd.id === activeId && player.currentTime >= rangeEnd.e) {
                     const e = rangeEnd.e;
@@ -3641,6 +3742,32 @@ window.__firebase_config = JSON.stringify({
             sel.onchange = () => { commentSort = sel.value; renderSocial(); };
             wrap.appendChild(sel);
             list.parentNode.insertBefore(wrap, list);
+        }
+
+        // ---- 新しい端末の確認(管理者がONにしているときだけ、Discordに通知される) ----
+        function getDeviceId() {
+            try {
+                let id = localStorage.getItem('device_id');
+                if (!id) {
+                    id = 'd' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+                    localStorage.setItem('device_id', id);
+                }
+                return id;
+            } catch (e) { return ''; }
+        }
+
+        async function deviceCheck() {
+            const base = trackBase();
+            const cred = gateCredentials();
+            const id = getDeviceId();
+            if (!base || !cred || !id) return;
+            try {
+                await fetch(base + '/device-check', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(Object.assign({ siteId: window.APP_UNIQUE_ID, deviceId: id }, cred))
+                });
+            } catch (e) {}
         }
 
         // ---- 区間を指定した共有リンク ----
@@ -3960,6 +4087,7 @@ window.__firebase_config = JSON.stringify({
             if (code === 'download-denied') return "ダウンロード権限が不足しています";
             if (code === 'no-role') return "この動画を見る権限がありません";
             if (code === 'role-restricted') return "この動画は、特定のロールの人だけが見られます";
+            if (code === 'not-published') return "この動画は、まだ公開されていません";
             if (code === 'discord-unavailable') return "Discordの確認が混み合っています。少し待ってから、もう一度お試しください";
             if (code === 'unauthorized') return "ログインの有効期限が切れました。もう一度ログインしてください";
             if (code === 'NETWORK') return "認証サーバーに接続できませんでした";
@@ -4669,6 +4797,7 @@ window.__firebase_config = JSON.stringify({
 
         // 動画ごとの「見られるロール」。空なら全員。Discordのロールを持つ人だけが見られる
         function canSeeVideo(v) {
+            if (Number(v.publishAt) > Date.now()) return false;
             const need = Array.isArray(v.roles) ? v.roles.map(String).filter(Boolean) : [];
             if (!need.length) return true;
             const isDiscord = !!(currentUserDiscordId || getStoredData('session_discord_id', ''));
