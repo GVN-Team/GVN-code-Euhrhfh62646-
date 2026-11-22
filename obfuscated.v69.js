@@ -3721,7 +3721,7 @@ window.__firebase_config = JSON.stringify({
             });
             loadStats();
             player.addEventListener('playing', () => { sendHeartbeat(); });
-            setInterval(sendHeartbeat, 30000);
+            setInterval(sendHeartbeat, 15000);
         }
 
         // ---- コメントの並び替え ----
